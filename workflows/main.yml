@@ -1,0 +1,60 @@
+# name: CI
+# on: push
+
+# jobs:
+#   test:
+#     runs-on: ubuntu-latest
+#     steps:
+#     - uses: actions/checkout@v2
+#     - uses: actions/setup-node@v1
+#     - run: npm install
+#     - run: npm test
+
+name: Access DQLABS
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  access-dqlabs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Get list of changed files
+        id: changed-files
+        run: |
+          FILES=$(gh pr view ${{ github.event.pull_request.number }} --json files --jq '.files[].path' | paste -sd "," -)
+          echo "changed_files_list=$FILES" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Print changed files
+        run: echo "Files changed: ${{ steps.changed-files.outputs.changed_files_list }}"
+
+      - name: Get OAuth token from DQLABS
+        id: get_token
+        run: |
+          RESPONSE=$(curl --silent --request POST 'https://backendqa.dqlabsai.net/api/api_token/' \
+            --header 'Content-Type: application/json' \
+            --header "client-id=$CLIENT_ID" \
+            --header "client-secret=$CLIENT_SECRET")
+          ACCESS_TOKEN=$(echo "$RESPONSE" | jq -r '.access_token')
+          echo "access_token=$ACCESS_TOKEN" >> $GITHUB_OUTPUT
+        env:
+          CLIENT_ID: ${{ secrets.CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
+
+      - name: Call DQLABS API with the token
+        run: |
+          curl -X GET 'https://backendqa.dqlabsai.net/api/asset/' \
+            -H "accept: application/json" \
+            -H "client-id=$CLIENT_ID" \
+            -H "client-secret=$CLIENT_SECRET" \
+            -H "Authorization: Bearer $TOKEN"
+        env:
+          TOKEN: ${{ steps.get_token.outputs.access_token }}
+          CLIENT_ID: ${{ secrets.CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
