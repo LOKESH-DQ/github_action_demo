@@ -8,7 +8,7 @@ const axios = require('axios');
     const changedFiles = core.getInput('changed_files_list').split(',');
 
     // Step 1: Authenticate to DQLabs
-    const authResp = await axios.post('https://your-dqlabs-api.com/oauth/token', {
+    const authResp = await axios.post('http://44.238.88.190:8000/api/api_token', {
       client_id: clientId,
       client_secret: clientSecret,
       grant_type: 'client_credentials'
@@ -19,14 +19,14 @@ const axios = require('axios');
     const impactedAssets = [];
 
     for (const filePath of changedFiles) {
-      const modelName = extractModelName(filePath); // You need to define this
-      const lineageResp = await axios.get(`https://your-dqlabs-api.com/lineage/${modelName}`, {
+      const modelName = extractModelName(filePath); // You need to define this logic
+      const lineageResp = await axios.get(`http://44.238.88.190:8000/api/lineage/${modelName}`, {
         headers: { Authorization: `Bearer ${accessToken}` }
       });
 
       impactedAssets.push({
         model: modelName,
-        downstream: lineageResp.data.downstream
+        downstream: lineageResp.data.downstream // Ensure this is the correct API response
       });
     }
 
@@ -50,3 +50,11 @@ const axios = require('axios');
     core.setFailed(`Error: ${error.message}`);
   }
 })();
+
+// Helper function to extract model name from file path
+function extractModelName(filePath) {
+  // Adjust the logic based on your naming conventions
+  // For example, strip off extensions and directories
+  const modelName = filePath.split('/').pop().replace(/\.(sql|yml)$/, '');
+  return modelName;
+}
