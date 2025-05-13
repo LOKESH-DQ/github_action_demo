@@ -7,7 +7,7 @@ on:
       - '**/*.yml'
 
 jobs:
-  print-changed-files:
+  impact-analysis:
     runs-on: ubuntu-latest
 
     steps:
@@ -22,21 +22,33 @@ jobs:
             **/*.sql
             **/*.yml
 
-      - name: Print changed files and fetch DBT assets
-        env:
-          CLIENT_ID: ${{ secrets.DQLABS_API_CLIENT_ID }}
-          CLIENT_SECRET: ${{ secrets.DQLABS_API_CLIENT_SECRET }}
+      - name: Print changed SQL/YML files
         run: |
           echo "Changed SQL/YML files:"
           echo "${{ steps.changed-files.outputs.all_changed_files }}"
-          
-          echo ""
+
+      - name: Debug - Check if secrets are set
+        run: |
+          if [ -z "${{ secrets.DQLABS_API_CLIENT_ID }}" ]; then
+            echo "Client ID is missing"
+          else
+            echo "Client ID is set"
+          fi
+
+          if [ -z "${{ secrets.DQLABS_API_CLIENT_SECRET }}" ]; then
+            echo "Client Secret is missing"
+          else
+            echo "Client Secret is set"
+          fi
+
+      - name: Fetch DQLabs Assets
+        run: |
           echo "Fetching DQLabs DBT Assets..."
 
-          assets_response=$(curl -s -X GET "http://44.238.88.190:8000/api/asset" \
-            -H "Content-Type: application/json" \
-            -d "{\"client-id\": \"$CLIENT_ID\", \"client-secret\": \"$CLIENT_SECRET\"}")
+          response=$(curl -s -X GET "http://44.238.88.190:8000/api/asset" \
+            -H "client-id: ${{ secrets.DQLABS_API_CLIENT_ID }}" \
+            -H "client-secret: ${{ secrets.DQLABS_API_CLIENT_SECRET }}" \
+            -H "Content-Type: application/json")
 
-          echo ""
           echo "DBT Assets:"
-          echo "$assets_response"
+          echo "$response"
