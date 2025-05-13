@@ -20,7 +20,7 @@ jobs:
         with:
           files: |
             **/*.sql
-            /**/*.yml
+            **/*.yml
 
       - name: Print changed files
         run: |
