@@ -3,8 +3,8 @@ name: "DBT Impact Analysis on PR"
 on:
   pull_request:
     paths:
-      - 'dbt/**/*.sql'
-      - 'dbt/**/*.yml'
+      - '**/*.sql'
+      - '**/*.yml'
 
 jobs:
   print-changed-files:
@@ -19,8 +19,8 @@ jobs:
         uses: tj-actions/changed-files@v39
         with:
           files: |
-            dbt/**/*.sql
-            dbt/**/*.yml
+            **/*.sql
+            /**/*.yml
 
       - name: Print changed files
         run: |
