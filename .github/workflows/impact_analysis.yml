@@ -33,10 +33,10 @@ jobs:
           echo ""
           echo "Fetching DQLabs DBT Assets..."
 
-          assets_response=$(curl -s -X POST "http://44.238.88.190:8000/api/asset" \
+          assets_response=$(curl -s -X GET "http://44.238.88.190:8000/api/asset" \
             -H "Content-Type: application/json" \
             -d "{\"client-id\": \"$CLIENT_ID\", \"client-secret\": \"$CLIENT_SECRET\"}")
 
           echo ""
           echo "DBT Assets:"
-          echo "$assets_response" | jq '.[] | select(.connection_type == "dbt")'
+          echo "$assets_response"
