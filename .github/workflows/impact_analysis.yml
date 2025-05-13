@@ -45,7 +45,7 @@ jobs:
         run: |
           echo "Fetching DQLabs DBT Assets..."
 
-          response=$(curl -s -X GET "http://44.238.88.190:8000/api/asset" \
+          response=$(curl -s -X GET "http://44.238.88.190:8000/api/asset/" \
             -H "client-id: ${{ secrets.DQLABS_API_CLIENT_ID }}" \
             -H "client-secret: ${{ secrets.DQLABS_API_CLIENT_SECRET }}" \
             -H "Content-Type: application/json")
