@@ -1,11 +1,9 @@
 {
   "name": "dqlabs-impact-analysis-action",
   "version": "1.0.0",
-  "description": "GitHub Action to perform DBT model impact analysis using DQLabs API",
   "main": "index.js",
   "dependencies": {
     "@actions/core": "^1.10.0",
-    "@actions/github": "^5.0.0",
-    "axios": "^1.4.0"
+    "axios": "^1.6.0"
   }
 }
