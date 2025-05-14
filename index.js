@@ -36,7 +36,7 @@ const getJobAssets = async (authToken) => {
   const response = await axios.post(
     jobUrl,
     {},
-    { headers: { Authorization: `Bearer ${authToken}` } }
+    // { headers: { Authorization: `Bearer ${authToken}` } }
   );
   return response.data.response.data;
 };
@@ -53,7 +53,7 @@ const getLineageData = async (authToken, asset_id, connection_id) => {
   const response = await axios.post(
     lineageUrl,
     body,
-    { headers: { Authorization: `Bearer ${authToken}` } }  // Authorization in the header
+    // { headers: { Authorization: `Bearer ${authToken}` } }  // Authorization in the header
   );
   
   return response.data.response.data.tables;  // Extract tables from the response
