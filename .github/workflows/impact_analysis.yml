@@ -77,21 +77,20 @@ jobs:
             **/*.sql
             **/*.yml
 
-      - name: Print Impact Analysis Step Input
-        run: |
-          echo "name: Run DQLabs Impact Analysis"
-          echo "uses: LOKESH-DQ/github_action_demo@main"
-          echo "with:"
-          echo "  api_client_id: \${{ secrets.DQLABS_API_CLIENT_ID }}"
-          echo "  api_client_secret: \${{ secrets.DQLABS_API_CLIENT_SECRET }}"
-          echo "  changed_files_list: \${{ steps.changes.outputs.all_changed_files }}"
-
       - name: Run DQLabs Impact Analysis
         uses: LOKESH-DQ/github_action_demo@main
         with:
           api_client_id: ${{ secrets.DQLABS_API_CLIENT_ID }}
           api_client_secret: ${{ secrets.DQLABS_API_CLIENT_SECRET }}
           changed_files_list: ${{ steps.changes.outputs.all_changed_files }}
+      - name: Print Impact Analysis Step Input
+        run: |
+          echo "name: Run DQLabs Impact Analysis"
+          echo "uses: LOKESH-DQ/github_action_demo@main"
+          echo "with:"
+          echo "  api_client_id: \${{ api_client_id }}"
+          echo "  api_client_secret: \${{ api_client_secret }}"
+          echo "  changed_files_list: \${{ steps.changes.outputs.all_changed_files }}"    
 
       - name: Show Summary in Logs
         run: echo "${{ steps.impact-analysis.outputs.impact_summary }}"
