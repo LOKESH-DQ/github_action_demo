@@ -1,21 +1,41 @@
-name: "DQLabs DBT Impact Analysis"
-description: "Performs impact analysis on DBT model changes using DQLabs API"
+# name: "DQLabs DBT Impact Analysis"
+# description: "Performs impact analysis on DBT model changes using DQLabs API"
 
+# inputs:
+#   api_client_id:
+#     description: "API Client ID to authenticate with DQLabs"
+#     required: true
+#   api_client_secret:
+#     description: "API Client Secret credentials for authentication"
+#     required: true
+#   changed_files_list:
+#     description: "Comma-separated list of changed DBT model files"
+#     required: true
+
+# outputs:
+#   impact_summary:
+#     description: "Formatted summary of the downstream impacts"
+
+# runs:
+#   using: "node16"
+#   main: "index.js"
+
+name: "DQLabs Impact Analysis"
+description: "Performs DBT model impact analysis via DQLabs API during PRs"
+author: "YourOrg"
 inputs:
   api_client_id:
     description: "API Client ID to authenticate with DQLabs"
     required: true
   api_client_secret:
-    description: "API Client Secret credentials for authentication"
+    description: "API Client Secret for authentication with DQLabs"
     required: true
   changed_files_list:
     description: "Comma-separated list of changed DBT model files"
     required: true
-
 outputs:
   impact_summary:
-    description: "Formatted summary of the downstream impacts"
-
+    description: "Structured Impact Analysis report"
 runs:
   using: "node16"
   main: "index.js"
