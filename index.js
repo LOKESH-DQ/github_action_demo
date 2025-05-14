@@ -6,8 +6,14 @@ const path = require("path");
 
 const clientId = core.getInput("api_client_id");
 const clientSecret = core.getInput("api_client_secret");
+const changedFilesList = core.getInput("changed_files_list");  // Get the list of changed files
 
 const getChangedFiles = async () => {
+  // Use the passed `changed_files_list` if provided, otherwise, fall back to GitHub event data
+  if (changedFilesList) {
+    return changedFilesList.split(",");  // Split the comma-separated string into an array of files
+  }
+
   const eventPath = process.env.GITHUB_EVENT_PATH;
   const eventData = JSON.parse(fs.readFileSync(eventPath, "utf8"));
   const changedFiles = new Set();
@@ -22,16 +28,7 @@ const getChangedFiles = async () => {
   return Array.from(changedFiles);
 };
 
-// const getAuthToken = async () => {
-//   const tokenUrl = "http://44.238.88.190:8000/api/api_token";
-//   const response = await axios.post(tokenUrl, {
-//     "client-id": clientId,
-//     "client-secret": clientSecret,
-//   });
-//   return response.data.token;
-// };
-
-const getJobAssets = async (authToken) => {
+const getJobAssets = async () => {
   const jobUrl = "http://44.238.88.190:8000/api/pipeline/job/";
   const response = await axios.post(
     jobUrl,
@@ -44,9 +41,9 @@ const getJobAssets = async (authToken) => {
   return response.data.response.data;
 };
 
-const getLineageData = async (authToken, asset_id, connection_id) => {
+const getLineageData = async (asset_id, connection_id) => {
   const lineageUrl = "http://44.238.88.190:8000/api/lineage/";
-  
+
   const body = {
     "asset_id": asset_id,
     "connection_id": connection_id,
@@ -77,8 +74,7 @@ const run = async () => {
 
     console.log("Changed models:", changedModels);
 
-    const authToken = await getAuthToken();
-    const jobAssets = await getJobAssets(authToken);
+    const jobAssets = await getJobAssets();
 
     // Filter relevant job assets
     const matchedAssets = jobAssets
@@ -103,7 +99,6 @@ const run = async () => {
 
     for (const asset of matchedAssets) {
       const lineageData = await getLineageData(
-        authToken,
         asset.asset_id,
         asset.connection_id
       );
