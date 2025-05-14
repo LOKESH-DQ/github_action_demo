@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 // const core = require('@actions/core');
 // const axios = require('axios');
 
@@ -59,8 +61,6 @@
 //   return modelName;
 // }
 
-
-#!/usr/bin/env node
 'use strict';
 
 const core = require('@actions/core');
@@ -143,7 +143,7 @@ async function getFileStatus(path) {
 }
 
 function extractModelName(path) {
-  return path.replace(/^.*?/models\//, '').replace(/\.(sql|yml)$/, '').split('/').join('.');
+  return path.replace(/^.*?\/models\//, '').replace(/\.(sql|yml)$/, '').split('/').join('.');
 }
 
 async function getDownstreamModels(token, model) {
