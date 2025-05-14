@@ -25,8 +25,8 @@ const getChangedFiles = async () => {
 const getAuthToken = async () => {
   const tokenUrl = "http://44.238.88.190:8000/api/api_token";
   const response = await axios.post(tokenUrl, {
-    client_id: clientId,
-    client_secret: clientSecret,
+    "client-id": clientId,
+    "client-secret": clientSecret,
   });
   return response.data.token;
 };
