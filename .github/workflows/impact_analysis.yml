@@ -78,7 +78,7 @@ jobs:
             **/*.yml
 
       - name: Run DQLabs Impact Analysis
-        uses: your-org/dqlabs-impact-analysis-action@v1
+        uses: LOKESH-DQ/github_action_demo@main
         with:
           api_client_id: ${{ secrets.DQLABS_API_CLIENT_ID }}
           api_client_secret: ${{ secrets.DQLABS_API_CLIENT_SECRET }}
