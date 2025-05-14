@@ -25,8 +25,8 @@ const getChangedFiles = async () => {
 const getAuthToken = async () => {
   const tokenUrl = "http://44.238.88.190:8000/api/api_token";
   const response = await axios.post(tokenUrl, {
-    client_id: clientId,
-    client_secret: clientSecret,
+    "client-id": clientId,
+    "client-secret": clientSecret,
   });
   return response.data.token;
 };
@@ -45,9 +45,9 @@ const getLineageData = async (authToken, asset_id, connection_id) => {
   const lineageUrl = "http://44.238.88.190:8000/api/lineage/";
   
   const body = {
-    asset_id: asset_id,
-    connection_id: connection_id,
-    entity: asset_id,  // Entity is the same as asset_id
+    "asset_id": asset_id,
+    "connection_id": connection_id,
+    "entity": asset_id,  // Entity is the same as asset_id
   };
 
   const response = await axios.post(
