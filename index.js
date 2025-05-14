@@ -22,21 +22,24 @@ const getChangedFiles = async () => {
   return Array.from(changedFiles);
 };
 
-const getAuthToken = async () => {
-  const tokenUrl = "http://44.238.88.190:8000/api/api_token";
-  const response = await axios.post(tokenUrl, {
-    "client-id": clientId,
-    "client-secret": clientSecret,
-  });
-  return response.data.token;
-};
+// const getAuthToken = async () => {
+//   const tokenUrl = "http://44.238.88.190:8000/api/api_token";
+//   const response = await axios.post(tokenUrl, {
+//     "client-id": clientId,
+//     "client-secret": clientSecret,
+//   });
+//   return response.data.token;
+// };
 
 const getJobAssets = async (authToken) => {
   const jobUrl = "http://44.238.88.190:8000/api/pipeline/job/";
   const response = await axios.post(
     jobUrl,
     {},
-    // { headers: { Authorization: `Bearer ${authToken}` } }
+    { headers: {
+        "client-id": clientId,
+        "client-secret": clientSecret,
+    } }
   );
   return response.data.response.data;
 };
@@ -53,7 +56,10 @@ const getLineageData = async (authToken, asset_id, connection_id) => {
   const response = await axios.post(
     lineageUrl,
     body,
-    // { headers: { Authorization: `Bearer ${authToken}` } }  // Authorization in the header
+    { headers: {
+        "client-id": clientId,
+        "client-secret": clientSecret,
+    } }
   );
   
   return response.data.response.data.tables;  // Extract tables from the response
