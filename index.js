@@ -112,9 +112,7 @@ const run = async () => {
 
     // Print commits as raw JSON block
     summary += `📢 **Commits in this PR:**\n`;
-    if (commits.length === 0) {
-      summary += `- None\n`;
-    } else {
+    if (commits) {
       summary += '```\n' + JSON.stringify(commits, null, 2) + '\n```\n';
     }
 
