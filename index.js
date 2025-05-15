@@ -17,22 +17,21 @@ const fetchFileContent = async (path, ref) => {
     owner,
     repo,
     path,
-    ref
+    ref,
   });
 
-  const content = Buffer.from(response.data.content, 'base64').toString('utf-8');
+  const content = Buffer.from(response.data.content, "base64").toString("utf-8");
   return content;
 };
 
 const getColumnDiffs = (oldCols = [], newCols = []) => {
-  const oldMap = Object.fromEntries((oldCols || []).map(col => [col.name, col]));
-  const newMap = Object.fromEntries((newCols || []).map(col => [col.name, col]));
+  const oldMap = Object.fromEntries((oldCols || []).map((col) => [col.name, col]));
+  const newMap = Object.fromEntries((newCols || []).map((col) => [col.name, col]));
 
-  const added = newCols.filter(col => !oldMap[col.name]);
-  const deleted = oldCols.filter(col => !newMap[col.name]);
-  const updated = newCols.filter(col =>
-    oldMap[col.name] &&
-    JSON.stringify(oldMap[col.name]) !== JSON.stringify(col)
+  const added = newCols.filter((col) => !oldMap[col.name]);
+  const deleted = oldCols.filter((col) => !newMap[col.name]);
+  const updated = newCols.filter(
+    (col) => oldMap[col.name] && JSON.stringify(oldMap[col.name]) !== JSON.stringify(col)
   );
 
   return { added, deleted, updated };
@@ -44,18 +43,18 @@ const getDownstreamAssets = async (asset_id, connection_id) => {
     {
       asset_id,
       connection_id,
-      entity: asset_id
+      entity: asset_id,
     },
     {
       headers: {
         "client-id": clientId,
-        "client-secret": clientSecret
-      }
+        "client-secret": clientSecret,
+      },
     }
   );
 
   const all = response.data?.response?.data?.tables || [];
-  return all.filter(x => x.flow === "downstream");
+  return all.filter((x) => x.flow === "downstream");
 };
 
 const getJobAssets = async () => {
@@ -65,8 +64,8 @@ const getJobAssets = async () => {
     {
       headers: {
         "client-id": clientId,
-        "client-secret": clientSecret
-      }
+        "client-secret": clientSecret,
+      },
     }
   );
 
@@ -85,7 +84,10 @@ const run = async () => {
       return;
     }
 
-    const changedFiles = changedFilesCSV.split(",").map(f => f.trim()).filter(f => f.length > 0);
+    const changedFiles = changedFilesCSV
+      .split(",")
+      .map((f) => f.trim())
+      .filter((f) => f.length > 0);
     if (changedFiles.length === 0) {
       core.setFailed("Changed files list is empty after processing.");
       return;
@@ -101,8 +103,8 @@ const run = async () => {
 
     const jobAssets = await getJobAssets();
 
-    let report = `\uD83E\uDDE0 **Impact Analysis Summary**\n\n`;
-    report += `\uD83D\uDCC4 **Changed DBT Models**:\n`;
+    let report = `🧠 **Impact Analysis Summary**\n\n`;
+    report += `📄 **Changed DBT Models**:\n`;
     const modelDiffs = [];
 
     for (const filePath of changedFiles) {
@@ -110,7 +112,7 @@ const run = async () => {
 
       const [oldContent, newContent] = await Promise.all([
         fetchFileContent(filePath, baseRef).catch(() => null),
-        fetchFileContent(filePath, headRef).catch(() => null)
+        fetchFileContent(filePath, headRef).catch(() => null),
       ]);
 
       if (!newContent) continue;
@@ -130,11 +132,11 @@ const run = async () => {
       const newModels = newDoc.models || [];
 
       for (const newModel of newModels) {
-        const oldModel = oldModels.find(m => m.name === newModel.name);
+        const oldModel = oldModels.find((m) => m.name === newModel.name);
         const diffs = getColumnDiffs(oldModel?.columns, newModel.columns);
 
         report += `- ${filePath}\n`;
-        report += `  - \uD83D\uDD95 Model: **${newModel.name}**\n`;
+        report += `  - 🏷️ Model: **${newModel.name}**\n`;
         report += `    - ➕ Added Columns: ${diffs.added.length}\n`;
         report += `    - 🛠️ Updated Columns: ${diffs.updated.length}\n`;
         report += `    - ❌ Deleted Columns: ${diffs.deleted.length}\n`;
@@ -143,7 +145,7 @@ const run = async () => {
           name: newModel.name,
           added: diffs.added.length,
           updated: diffs.updated.length,
-          deleted: diffs.deleted.length
+          deleted: diffs.deleted.length,
         });
       }
     }
@@ -151,36 +153,60 @@ const run = async () => {
     let downstream = [];
 
     for (const diff of modelDiffs) {
-      const asset = jobAssets.find(
-        a => a.name === diff.name && a.connection_type === "dbt"
-      );
+      const asset = jobAssets.find((a) => a.name === diff.name && a.connection_type === "dbt");
 
       if (asset) {
-        console.log(`Fetching downstream for ${asset.name} (asset_id=${asset.asset_id}, connection_id=${asset.connection_id})`);
+        console.log(
+          `Fetching downstream for ${asset.name} (asset_id=${asset.asset_id}, connection_id=${asset.connection_id})`
+        );
         const ds = await getDownstreamAssets(asset.asset_id, asset.connection_id);
         downstream = downstream.concat(ds);
       }
     }
 
-    downstream = downstream.filter((v, i, a) => a.findIndex(x => x.name === v.name) === i);
+    // Remove duplicates by name
+    downstream = downstream.filter((v, i, a) => a.findIndex((x) => x.name === v.name) === i);
 
     if (downstream.length) {
-      report += `\n\uD83D\uDD17 **Downstream Assets**:\n`;
-      downstream.forEach(d => {
+      report += `\n🔗 **Downstream Assets**:\n`;
+      downstream.forEach((d) => {
         report += `- ${d.name} (${d.connection_name})\n`;
       });
     } else {
-      report += `\n\uD83D\uDD17 **Downstream Assets**: None found\n`;
+      report += `\n🔗 **Downstream Assets**: None found\n`;
     }
 
     console.log(report);
 
+    // Post comment on PR as you already do
     await octokit.rest.issues.createComment({
       owner: context.repo.owner,
       repo: context.repo.repo,
       issue_number: context.payload.pull_request.number,
-      body: report
+      body: report,
     });
+
+    // Write the markdown summary for the GitHub Actions UI
+    let summaryMd = `## 🧠 Impact Analysis Summary\n\n`;
+    summaryMd += `### 📄 Changed DBT Models:\n`;
+    modelDiffs.forEach((m) => {
+      summaryMd += `- **${m.name}**\n`;
+      summaryMd += `  - ➕ Added Columns: ${m.added}\n`;
+      summaryMd += `  - 🛠️ Updated Columns: ${m.updated}\n`;
+      summaryMd += `  - ❌ Deleted Columns: ${m.deleted}\n`;
+    });
+    summaryMd += `\n### 🔗 Downstream Assets:\n`;
+    if (downstream.length > 0) {
+      downstream.forEach((d) => {
+        summaryMd += `- \`${d.name}\` (_${d.connection_name}_)\n`;
+      });
+    } else {
+      summaryMd += `- None found\n`;
+    }
+
+    await core.summary
+      .addRaw(summaryMd)
+      .write();
 
     core.setOutput("downstream_assets", JSON.stringify(downstream));
   } catch (error) {
