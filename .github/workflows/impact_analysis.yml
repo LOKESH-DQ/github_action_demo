@@ -80,7 +80,7 @@ jobs:
           files: |
             **/*.sql
             **/*.yml
-            include_removed: true
+          include_removed: true
 
       - name: Run DQLabs Impact Analysis
         id: impact-analysis  # 🔄 Added to expose outputs
@@ -88,7 +88,7 @@ jobs:
         with:
           api_client_id: ${{ secrets.DQLABS_API_CLIENT_ID }}
           api_client_secret: ${{ secrets.DQLABS_API_CLIENT_SECRET }}
-          changed_files_list: ${{ steps.changes.outputs.all_changed_files }} ${{ steps.changes.outputs.removed_files }}
+          changed_files_list: "${{ steps.changes.outputs.all_changed_files }} ${{ steps.changes.outputs.removed_files }}"
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Show Summary in Logs
