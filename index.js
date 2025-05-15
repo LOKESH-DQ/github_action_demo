@@ -7,7 +7,8 @@ const clientId = core.getInput("api_client_id");
 const clientSecret = core.getInput("api_client_secret");
 const changedFilesCSV = core.getInput("changed_files_list");
 
-const octokit = github.getOctokit(process.env.GITHUB_TOKEN);
+const token = core.getInput("GITHUB_TOKEN");
+const octokit = github.getOctokit(token);
 const context = github.context;
 
 const fetchFileContent = async (path, ref) => {
@@ -74,9 +75,24 @@ const getJobAssets = async () => {
 
 const run = async () => {
   try {
-    const changedFiles = changedFilesCSV.split(",").map(f => f.trim());
-    const baseRef = context.payload.pull_request.base.sha;
-    const headRef = context.payload.pull_request.head.sha;
+    if (!changedFilesCSV) {
+      core.setFailed("No changed files provided.");
+      return;
+    }
+
+    const changedFiles = changedFilesCSV.split(",").map(f => f.trim()).filter(f => f.length > 0);
+    if (changedFiles.length === 0) {
+      core.setFailed("Changed files list is empty after processing.");
+      return;
+    }
+
+    const baseRef = context.payload.pull_request?.base?.sha;
+    const headRef = context.payload.pull_request?.head?.sha;
+
+    if (!baseRef || !headRef) {
+      core.setFailed("Cannot find base or head SHA from PR context.");
+      return;
+    }
 
     const jobAssets = await getJobAssets();
 
@@ -121,7 +137,7 @@ const run = async () => {
     }
 
     // Add downstream
-    const downstream = [];
+    let downstream = [];
 
     for (const diff of modelDiffs) {
       const asset = jobAssets.find(
@@ -130,9 +146,12 @@ const run = async () => {
 
       if (asset) {
         const ds = await getDownstreamAssets(asset.asset_id, asset.connection_id);
-        ds.forEach(d => downstream.push(d));
+        downstream = downstream.concat(ds);
       }
     }
+
+    // Deduplicate downstream assets by name
+    downstream = downstream.filter((v, i, a) => a.findIndex(x => x.name === v.name) === i);
 
     if (downstream.length) {
       report += `\n🔗 **Downstream Assets**:\n`;
@@ -145,11 +164,11 @@ const run = async () => {
 
     console.log(report);
 
-    // Comment on PR
+    // Post comment to PR
     await octokit.rest.issues.createComment({
       owner: context.repo.owner,
       repo: context.repo.repo,
-      issue_number: context.issue.number,
+      issue_number: context.payload.pull_request.number,
       body: report
     });
 
