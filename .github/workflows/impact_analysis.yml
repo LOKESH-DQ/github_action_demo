@@ -92,3 +92,12 @@ jobs:
 
       - name: Show Summary in Logs
         run: echo "${{ steps.impact-analysis.outputs.impact_summary }}"
+      
+      - name: Debug changed files
+        run: |
+          echo "All files: ${{ steps.changes.outputs.all_files }}"
+          echo "Added files: ${{ steps.changes.outputs.added_files }}"
+          echo "Modified files: ${{ steps.changes.outputs.modified_files }}"
+          echo "Removed files: ${{ steps.changes.outputs.removed_files }}"
+          echo "Renamed files: ${{ steps.changes.outputs.renamed_files }}"
+          echo "All changed files: ${{ steps.changes.outputs.all_changed_files }}"
