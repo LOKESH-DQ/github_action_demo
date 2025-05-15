@@ -1,17 +1,15 @@
 const core = require("@actions/core");
-const github = require("@actions/github");
 const axios = require("axios");
 const fs = require("fs");
 const path = require("path");
 
 const clientId = core.getInput("api_client_id");
 const clientSecret = core.getInput("api_client_secret");
-const changedFilesList = core.getInput("changed_files_list");  // Get the list of changed files
+const changedFilesList = core.getInput("changed_files_list");  // Optional
 
 const getChangedFiles = async () => {
-  // Use the passed `changed_files_list` if provided, otherwise, fall back to GitHub event data
   if (changedFilesList) {
-    return changedFilesList.split(",");  // Split the comma-separated string into an array of files
+    return changedFilesList.split(",").map(f => f.trim());
   }
 
   const eventPath = process.env.GITHUB_EVENT_PATH;
@@ -33,50 +31,48 @@ const getJobAssets = async () => {
   const response = await axios.post(
     jobUrl,
     {},
-    { headers: {
+    {
+      headers: {
         "client-id": clientId,
         "client-secret": clientSecret,
-    } }
+      },
+    }
   );
   return response.data.response.data;
 };
 
 const getLineageData = async (asset_id, connection_id) => {
   const lineageUrl = "http://44.238.88.190:8000/api/lineage/";
-
   const body = {
-    "asset_id": asset_id,
-    "connection_id": connection_id,
-    "entity": asset_id,  // Entity is the same as asset_id
+    asset_id,
+    connection_id,
+    entity: asset_id,
   };
 
   const response = await axios.post(
     lineageUrl,
     body,
-    { headers: {
+    {
+      headers: {
         "client-id": clientId,
         "client-secret": clientSecret,
-    } }
+      },
+    }
   );
-  
-  return response.data.response.data.tables;  // Extract tables from the response
+
+  return response.data.response.data.tables;
 };
 
 const run = async () => {
   try {
     const changedFiles = await getChangedFiles();
-    console.log("Changed files:", changedFiles);
 
-    // Extract model names from paths like models/customer.yml -> "customer"
     const changedModels = changedFiles
-      .filter((file) => file.endsWith(".yml") || file.endsWith(".sql"))  // Check for both .yml and .sql files
-      .map((file) => path.basename(file, path.extname(file)));  // Extract the file name without the extension
-
-    console.log("Changed models:", changedModels);
+      .filter((file) => file.endsWith(".yml") || file.endsWith(".sql"))
+      .map((file) => path.basename(file, path.extname(file)));
 
     const jobAssets = await getJobAssets();
 
-    // Filter relevant job assets
     const matchedAssets = jobAssets
       .filter(
         (asset) =>
@@ -88,37 +84,45 @@ const run = async () => {
         asset_id: asset.asset_id,
         connection_id: asset.connection_id,
         connection_name: asset.connection_name,
-        connection_type: asset.connection_type,
       }));
 
-    console.log("Matched job assets:");
-    console.log(JSON.stringify(matchedAssets, null, 2));
-
-    // Get lineage data for each matched asset
     const downstreamAssets = [];
 
     for (const asset of matchedAssets) {
-      const lineageData = await getLineageData(
-        asset.asset_id,
-        asset.connection_id
-      );
+      const lineageTables = await getLineageData(asset.asset_id, asset.connection_id);
+      const downstream = lineageTables.filter((table) => table.flow === "downstream");
 
-      // Filter downstream assets
-      const downstream = lineageData.filter(
-        (table) => table.flow === "downstream"
-      );
-
-      downstream.forEach((lineage) => {
+      downstream.forEach((table) => {
         downstreamAssets.push({
-          name: lineage.name,
-          connection_name: lineage.connection_name,
+          name: table.name,
+          connection_name: table.connection_name,
         });
       });
     }
 
-    console.log("Downstream assets:");
-    console.log(JSON.stringify(downstreamAssets, null, 2));
+    // Build and print the markdown summary
+    let summary = `🧠 **Impact Analysis Summary**\n\n`;
 
+    summary += `📄 **Changed DBT Models:**\n`;
+    if (changedModels.length === 0) {
+      summary += `- None\n`;
+    } else {
+      changedModels.forEach((model) => {
+        summary += `- ${model}\n`;
+      });
+    }
+
+    summary += `\n🔗 **Downstream Assets:**\n`;
+    if (downstreamAssets.length === 0) {
+      summary += `- None found\n`;
+    } else {
+      downstreamAssets.forEach((asset) => {
+        summary += `- ${asset.name} (${asset.connection_name})\n`;
+      });
+    }
+
+    console.log(summary);
+    core.setOutput("impact_markdown", summary);
     core.setOutput("downstream_assets", JSON.stringify(downstreamAssets));
   } catch (error) {
     core.setFailed(`Error: ${error.message}`);
