@@ -71,7 +71,8 @@ const run = async () => {
 
     const changedModels = changedFiles
       .filter((file) => file.endsWith(".yml") || file.endsWith(".sql"))
-      .map((file) => path.basename(file, path.extname(file)));
+      .map((file) => path.basename(file, path.extname(file)))
+      .filter((name, index, self) => name && self.indexOf(name) === index);
 
     const jobAssets = await getJobAssets();
 
