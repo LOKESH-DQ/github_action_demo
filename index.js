@@ -111,12 +111,24 @@ const run = async () => {
     let summary = `🧠 **Impact Analysis Summary**\n\n`;
 
     // Print commits as raw JSON block
-    summary += `📢 **Commits in this PR:**\n`;
-    if (commits) {
+    summary += `📜 **Commits in this PR:**\n`;
+    if (commits.length === 0) {
+      summary += `None\n`;
+    } else {
       summary += '```\n' + JSON.stringify(commits, null, 2) + '\n```\n';
     }
 
-    // Changed DBT models
+    // Print raw changed files list from input (if any)
+    summary += `\n📂 **Raw Changed Files List:**\n`;
+    if (!changedFilesList || changedFilesList.trim() === "") {
+      summary += `- None\n`;
+    } else {
+      changedFilesList.split(",").map(f => f.trim()).forEach((file) => {
+        summary += `- ${file}\n`;
+      });
+    }
+
+    // Print filtered changed models
     summary += `\n📄 **Changed DBT Models:**\n`;
     if (changedModels.length === 0) {
       summary += `- None\n`;
@@ -126,7 +138,7 @@ const run = async () => {
       });
     }
 
-    // Downstream assets
+    // Print downstream assets
     summary += `\n🔗 **Downstream Assets:**\n`;
     if (downstreamAssets.length === 0) {
       summary += `- None found\n`;
