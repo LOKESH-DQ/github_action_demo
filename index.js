@@ -19,6 +19,13 @@ const getChangedFiles = async () => {
   const changedFiles = new Set();
 
   const commits = eventData.commits || [];
+
+  // Debug: print full commits info
+  core.info(`Commits received: ${JSON.stringify(commits, null, 2)}`);
+
+  // Debug: print only removed files from commits
+  core.info(`Removed files in commits: ${JSON.stringify(commits.map(c => c.removed), null, 2)}`);
+
   commits.forEach((commit) => {
     [...commit.added, ...commit.modified, ...commit.removed].forEach((file) => {
       changedFiles.add(file);
