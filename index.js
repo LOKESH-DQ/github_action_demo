@@ -75,6 +75,11 @@ const getJobAssets = async () => {
 
 const run = async () => {
   try {
+    if (!context.payload.pull_request) {
+      core.setFailed("This action only runs on pull_request events.");
+      return;
+    }
+
     if (!changedFilesCSV) {
       core.setFailed("No changed files provided.");
       return;
@@ -96,9 +101,8 @@ const run = async () => {
 
     const jobAssets = await getJobAssets();
 
-    let report = `🧠 **Impact Analysis Summary**\n\n`;
-
-    report += `📄 **Changed DBT Models**:\n`;
+    let report = `\uD83E\uDDE0 **Impact Analysis Summary**\n\n`;
+    report += `\uD83D\uDCC4 **Changed DBT Models**:\n`;
     const modelDiffs = [];
 
     for (const filePath of changedFiles) {
@@ -106,13 +110,21 @@ const run = async () => {
 
       const [oldContent, newContent] = await Promise.all([
         fetchFileContent(filePath, baseRef).catch(() => null),
-        fetchFileContent(filePath, headRef),
+        fetchFileContent(filePath, headRef).catch(() => null)
       ]);
 
       if (!newContent) continue;
 
-      const oldDoc = oldContent ? yaml.load(oldContent) : {};
-      const newDoc = yaml.load(newContent);
+      let oldDoc = {};
+      let newDoc = {};
+
+      try {
+        if (oldContent) oldDoc = yaml.load(oldContent) || {};
+        newDoc = yaml.load(newContent) || {};
+      } catch (err) {
+        console.warn(`YAML parsing failed for ${filePath}: ${err.message}`);
+        continue;
+      }
 
       const oldModels = oldDoc.models || [];
       const newModels = newDoc.models || [];
@@ -122,7 +134,7 @@ const run = async () => {
         const diffs = getColumnDiffs(oldModel?.columns, newModel.columns);
 
         report += `- ${filePath}\n`;
-        report += `  - 🆕 Model: **${newModel.name}**\n`;
+        report += `  - \uD83D\uDD95 Model: **${newModel.name}**\n`;
         report += `    - ➕ Added Columns: ${diffs.added.length}\n`;
         report += `    - 🛠️ Updated Columns: ${diffs.updated.length}\n`;
         report += `    - ❌ Deleted Columns: ${diffs.deleted.length}\n`;
@@ -136,7 +148,6 @@ const run = async () => {
       }
     }
 
-    // Add downstream
     let downstream = [];
 
     for (const diff of modelDiffs) {
@@ -145,26 +156,25 @@ const run = async () => {
       );
 
       if (asset) {
+        console.log(`Fetching downstream for ${asset.name} (asset_id=${asset.asset_id}, connection_id=${asset.connection_id})`);
         const ds = await getDownstreamAssets(asset.asset_id, asset.connection_id);
         downstream = downstream.concat(ds);
       }
     }
 
-    // Deduplicate downstream assets by name
     downstream = downstream.filter((v, i, a) => a.findIndex(x => x.name === v.name) === i);
 
     if (downstream.length) {
-      report += `\n🔗 **Downstream Assets**:\n`;
+      report += `\n\uD83D\uDD17 **Downstream Assets**:\n`;
       downstream.forEach(d => {
         report += `- ${d.name} (${d.connection_name})\n`;
       });
     } else {
-      report += `\n🔗 **Downstream Assets**: None found\n`;
+      report += `\n\uD83D\uDD17 **Downstream Assets**: None found\n`;
     }
 
     console.log(report);
 
-    // Post comment to PR
     await octokit.rest.issues.createComment({
       owner: context.repo.owner,
       repo: context.repo.repo,
