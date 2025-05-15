@@ -72,6 +72,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for all branches and tags
 
       - name: Get changed DBT files
         id: changes
@@ -81,6 +83,13 @@ jobs:
             **/*.sql
             **/*.yml
           include_removed: true
+          include_renamed: true
+          include_added: true
+          include_modified: true
+          include_all: true
+          include_untracked: true
+          include_staged: true
+          
 
       - name: Run DQLabs Impact Analysis
         id: impact-analysis  # 🔄 Added to expose outputs
