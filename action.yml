@@ -21,21 +21,30 @@
 #   main: "index.js"
 
 name: "DQLabs Impact Analysis"
-description: "Performs DBT model impact analysis via DQLabs API during PRs"
+description: "Performs DBT model impact analysis via DQLabs API during PRs and posts the results as a PR comment"
 author: "YourOrg"
+
 inputs:
   api_client_id:
     description: "API Client ID to authenticate with DQLabs"
     required: true
+
   api_client_secret:
     description: "API Client Secret for authentication with DQLabs"
     required: true
+
   changed_files_list:
     description: "Comma-separated list of changed DBT model files"
     required: true
+
+  github_token:
+    description: "GitHub token to comment on the Pull Request"
+    required: true
+
 outputs:
   impact_summary:
-    description: "Structured Impact Analysis report"
+    description: "Structured Impact Analysis report (downstream impact and column changes)"
+
 runs:
   using: "node16"
   main: "index.js"

@@ -83,6 +83,7 @@ jobs:
           api_client_id: ${{ secrets.DQLABS_API_CLIENT_ID }}
           api_client_secret: ${{ secrets.DQLABS_API_CLIENT_SECRET }}
           changed_files_list: ${{ steps.changes.outputs.all_changed_files }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Show Summary in Logs
         run: echo "${{ steps.impact-analysis.outputs.impact_summary }}"
