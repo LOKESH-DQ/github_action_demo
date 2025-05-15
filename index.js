@@ -69,12 +69,7 @@ const run = async () => {
   try {
     const eventPath = process.env.GITHUB_EVENT_PATH;
     const eventData = JSON.parse(fs.readFileSync(eventPath, "utf8"));
-
-    // Get commits info for summary
     const commits = eventData.commits || [];
-    const commitMessages = commits.map(
-      (c) => `- ${c.id.substring(0, 7)}: ${c.message.split("\n")[0]}`
-    );
 
     const changedFiles = await getChangedFiles();
 
@@ -115,15 +110,15 @@ const run = async () => {
     // Build markdown summary
     let summary = `🧠 **Impact Analysis Summary**\n\n`;
 
-    summary += `📝 **Commits in this PR:**\n`;
-    if (commitMessages.length === 0) {
+    // Print commits as raw JSON block
+    summary += `📢 **Commits in this PR:**\n`;
+    if (commits.length === 0) {
       summary += `- None\n`;
     } else {
-      commitMessages.forEach((msg) => {
-        summary += `${msg}\n`;
-      });
+      summary += '```\n' + JSON.stringify(commits, null, 2) + '\n```\n';
     }
 
+    // Changed DBT models
     summary += `\n📄 **Changed DBT Models:**\n`;
     if (changedModels.length === 0) {
       summary += `- None\n`;
@@ -133,6 +128,7 @@ const run = async () => {
       });
     }
 
+    // Downstream assets
     summary += `\n🔗 **Downstream Assets:**\n`;
     if (downstreamAssets.length === 0) {
       summary += `- None found\n`;
@@ -167,6 +163,7 @@ const run = async () => {
     // Set outputs
     core.setOutput("impact_markdown", summary);
     core.setOutput("downstream_assets", JSON.stringify(downstreamAssets));
+
   } catch (error) {
     core.setFailed(`Error: ${error.message}`);
   }
