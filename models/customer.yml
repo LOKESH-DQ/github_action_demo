@@ -1,5 +1,5 @@
 model:
-  name: snowflake_JOBS_CUSTOMERAI
+  name: Customer
   attributes:
     firstName:
       type: string
