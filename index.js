@@ -1,4 +1,5 @@
 const core = require("@actions/core");
+const github = require("@actions/github");
 const axios = require("axios");
 const fs = require("fs");
 const path = require("path");
@@ -6,6 +7,7 @@ const path = require("path");
 const clientId = core.getInput("api_client_id");
 const clientSecret = core.getInput("api_client_secret");
 const changedFilesList = core.getInput("changed_files_list");  // Optional
+const githubToken = core.getInput("GITHUB_TOKEN");
 
 const getChangedFiles = async () => {
   if (changedFilesList) {
@@ -100,7 +102,7 @@ const run = async () => {
       });
     }
 
-    // Build and print the markdown summary
+    // Build markdown summary
     let summary = `🧠 **Impact Analysis Summary**\n\n`;
 
     summary += `📄 **Changed DBT Models:**\n`;
@@ -122,8 +124,31 @@ const run = async () => {
     }
 
     console.log(summary);
+
+    // Post comment on PR (if PR context exists)
+    const octokit = github.getOctokit(githubToken);
+    const context = github.context;
+
+    if (context.payload.pull_request) {
+      await octokit.rest.issues.createComment({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        issue_number: context.payload.pull_request.number,
+        body: summary,
+      });
+    } else {
+      core.info("No pull request found in the context, skipping comment post.");
+    }
+
+    // Write summary to GitHub Actions UI
+    await core.summary
+      .addRaw(summary)
+      .write();
+
+    // Set outputs
     core.setOutput("impact_markdown", summary);
     core.setOutput("downstream_assets", JSON.stringify(downstreamAssets));
+
   } catch (error) {
     core.setFailed(`Error: ${error.message}`);
   }
