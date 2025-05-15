@@ -19,13 +19,6 @@ const getChangedFiles = async () => {
   const changedFiles = new Set();
 
   const commits = eventData.commits || [];
-
-  // Debug: print full commits info
-  core.info(`Commits received: ${JSON.stringify(commits, null, 2)}`);
-
-  // Debug: print only removed files from commits
-  core.info(`Removed files in commits: ${JSON.stringify(commits.map(c => c.removed), null, 2)}`);
-
   commits.forEach((commit) => {
     [...commit.added, ...commit.modified, ...commit.removed].forEach((file) => {
       changedFiles.add(file);
@@ -74,6 +67,15 @@ const getLineageData = async (asset_id, connection_id) => {
 
 const run = async () => {
   try {
+    const eventPath = process.env.GITHUB_EVENT_PATH;
+    const eventData = JSON.parse(fs.readFileSync(eventPath, "utf8"));
+
+    // Get commits info for summary
+    const commits = eventData.commits || [];
+    const commitMessages = commits.map(
+      (c) => `- ${c.id.substring(0, 7)}: ${c.message.split("\n")[0]}`
+    );
+
     const changedFiles = await getChangedFiles();
 
     const changedModels = changedFiles
@@ -113,7 +115,16 @@ const run = async () => {
     // Build markdown summary
     let summary = `🧠 **Impact Analysis Summary**\n\n`;
 
-    summary += `📄 **Changed DBT Models:**\n`;
+    summary += `📝 **Commits in this PR:**\n`;
+    if (commitMessages.length === 0) {
+      summary += `- None\n`;
+    } else {
+      commitMessages.forEach((msg) => {
+        summary += `${msg}\n`;
+      });
+    }
+
+    summary += `\n📄 **Changed DBT Models:**\n`;
     if (changedModels.length === 0) {
       summary += `- None\n`;
     } else {
@@ -156,7 +167,6 @@ const run = async () => {
     // Set outputs
     core.setOutput("impact_markdown", summary);
     core.setOutput("downstream_assets", JSON.stringify(downstreamAssets));
-
   } catch (error) {
     core.setFailed(`Error: ${error.message}`);
   }
