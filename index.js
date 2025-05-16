@@ -183,6 +183,9 @@ const run = async () => {
       const baseCols = baseContent ? extractColumnsFromSQL(baseContent) : [];
       const headCols = extractColumnsFromSQL(headContent);
 
+      summary += `  - 📋 All Old Columns: ${baseCols.join(", ")}\n`;
+      summary += `  - 📋 All New Columns: ${headCols.join(", ")}\n`;
+
       const added = headCols.filter(col => !baseCols.includes(col));
       const removed = baseCols.filter(col => !headCols.includes(col));
 
