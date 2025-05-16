@@ -77,19 +77,13 @@ jobs:
 
       - name: Get changed DBT files
         id: changes
-        uses: tj-actions/changed-files@v39
+        uses: step-security/changed-files@v1
         with:
           files: |
             **/*.sql
             **/*.yml
           include_removed: true
           include_renamed: true
-          include_added: true
-          include_modified: true
-          include_all: true
-          include_untracked: true
-          include_staged: true
-          
 
       - name: Run DQLabs Impact Analysis
         id: impact-analysis  # 🔄 Added to expose outputs
@@ -111,3 +105,4 @@ jobs:
           echo "Removed files: ${{ steps.changes.outputs.removed_files }}"
           echo "Renamed files: ${{ steps.changes.outputs.renamed_files }}"
           echo "All changed files: ${{ steps.changes.outputs.all_changed_files }}"
+          echo "Changed files list: ${{ steps.changes.outputs.all_changed_files }} ${{ steps.changes.outputs.removed_files }}"
