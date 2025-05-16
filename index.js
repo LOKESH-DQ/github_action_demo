@@ -199,6 +199,12 @@ const run = async () => {
     } else {
       changedModels.forEach(model => {
         summary += `- ${model}\n`;
+
+        const baseCols = modelBaseColumns[model] || [];
+        const headCols = modelHeadColumns[model] || [];
+
+        summary += `  \n  // Base Columns: \`${baseCols.join(", ")}\`\n`;
+        summary += `  // Head Columns: \`${headCols.join(", ")}\`\n`;
       });
     }
 
