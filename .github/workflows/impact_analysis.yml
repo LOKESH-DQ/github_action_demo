@@ -103,7 +103,7 @@ jobs:
         with:
           api_client_id: ${{ secrets.DQLABS_API_CLIENT_ID }}
           api_client_secret: ${{ secrets.DQLABS_API_CLIENT_SECRET }}
-          changed_files_list: ${{ steps.changes.outputs.all_changed_files }},${{ steps.changes.outputs.removed_files }}
+          changed_files_list: ${{ steps.changes.outputs.all_changed_files }},${{ steps.changes.outputs.deleted_files }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
       # Show summary logs for debugging

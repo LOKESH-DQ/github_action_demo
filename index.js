@@ -5,6 +5,9 @@ const fs = require("fs");
 const path = require("path");
 const yaml = require("js-yaml");
 
+// 👇 Import the SQL parser utilities
+const { extractColumnsFromSQL, getFileContent } = require("./sql-parser");
+
 const clientId = core.getInput("api_client_id");
 const clientSecret = core.getInput("api_client_secret");
 const changedFilesList = core.getInput("changed_files_list"); // comma separated list
@@ -122,10 +125,7 @@ const compareColumns = (oldCols, newCols) => {
 
 const run = async () => {
   try {
-    const eventPath = process.env.GITHUB_EVENT_PATH;
-    const eventData = JSON.parse(fs.readFileSync(eventPath, "utf8"));
-    const commits = eventData.commits || [];
-
+    const context = github.context;
     const changedFiles = await getChangedFiles();
 
     const changedModels = changedFiles
@@ -159,6 +159,7 @@ const run = async () => {
       });
     }
 
+    // YAML file column comparison
     const columnChanges = [];
     for (const file of changedFiles.filter(f => f.endsWith(".yml"))) {
       const basePath = path.join("base", file);
@@ -168,6 +169,25 @@ const run = async () => {
       const { added, removed, modified } = compareColumns(baseColumns, headColumns);
       if (added.length > 0 || removed.length > 0 || modified.length > 0) {
         columnChanges.push({ file, added, removed, modified });
+      }
+    }
+
+    // SQL file column comparison
+    const sqlColumnChanges = [];
+    for (const file of changedFiles.filter(f => f.endsWith(".sql"))) {
+      const baseContent = getFileContent("base", file);
+      const headContent = getFileContent("HEAD", file);
+
+      if (!headContent) continue;
+
+      const baseCols = baseContent ? extractColumnsFromSQL(baseContent) : [];
+      const headCols = extractColumnsFromSQL(headContent);
+
+      const added = headCols.filter(col => !baseCols.includes(col));
+      const removed = baseCols.filter(col => !headCols.includes(col));
+
+      if (added.length > 0 || removed.length > 0) {
+        sqlColumnChanges.push({ file, added, removed });
       }
     }
 
@@ -195,7 +215,7 @@ const run = async () => {
     }
 
     if (columnChanges.length > 0) {
-      summary += `\n🧬 **Column-Level Changes:**\n`;
+      summary += `\n🧬 **YAML Column-Level Changes:**\n`;
       for (const change of columnChanges) {
         summary += `\n- \`${change.file}\`\n`;
         if (change.added.length > 0) {
@@ -215,10 +235,22 @@ const run = async () => {
       }
     }
 
+    if (sqlColumnChanges.length > 0) {
+      summary += `\n🧾 **SQL Column Changes:**\n`;
+      for (const change of sqlColumnChanges) {
+        summary += `\n- \`${change.file}\`\n`;
+        if (change.added.length > 0) {
+          summary += `  - ➕ Added: ${change.added.join(", ")}\n`;
+        }
+        if (change.removed.length > 0) {
+          summary += `  - ➖ Removed: ${change.removed.join(", ")}\n`;
+        }
+      }
+    }
+
     console.log(summary);
 
     const octokit = github.getOctokit(githubToken);
-    const context = github.context;
 
     if (context.payload.pull_request) {
       await octokit.rest.issues.createComment({
@@ -231,13 +263,10 @@ const run = async () => {
       core.info("No pull request found in the context, skipping comment post.");
     }
 
-    await core.summary
-      .addRaw(summary)
-      .write();
+    await core.summary.addRaw(summary).write();
 
     core.setOutput("impact_markdown", summary);
     core.setOutput("downstream_assets", JSON.stringify(downstreamAssetsMap));
-
   } catch (error) {
     core.setFailed(`Error: ${error.message}`);
   }
