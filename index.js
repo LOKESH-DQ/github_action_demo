@@ -198,6 +198,11 @@ const run = async () => {
     for (const file of changedFiles.filter(f => f.endsWith(".sql"))) {
       const baseContent = getFileContent("base", file);
       const headContent = getFileContent("HEAD", file);
+      const ref = "HEAD";
+      const ref2 = "base";
+      summary += `head is ${ref}\n`;
+      summary += `base is ${ref2}\n`;
+      summary += `file is ${file}\n`;
 
       if (!headContent) continue;
 
