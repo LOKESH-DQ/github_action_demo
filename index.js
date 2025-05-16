@@ -183,9 +183,6 @@ const run = async () => {
       const baseCols = baseContent ? extractColumnsFromSQL(baseContent) : [];
       const headCols = extractColumnsFromSQL(headContent);
 
-      let summary = `  - 📋 All Old Columns: ${baseCols.join(", ")}\n`;
-      summary += `  - 📋 All New Columns: ${headCols.join(", ")}\n`;
-
       const added = headCols.filter(col => !baseCols.includes(col));
       const removed = baseCols.filter(col => !headCols.includes(col));
 
@@ -194,7 +191,7 @@ const run = async () => {
       }
     }
 
-    summary += `🧠 **Impact Analysis Summary**\n\n`;
+    let summary = `🧠 **Impact Analysis Summary**\n\n`;
 
     summary += `\n📄 **Changed DBT Models:**\n`;
     if (changedModels.length === 0) {
@@ -221,16 +218,6 @@ const run = async () => {
       summary += `\n🧬 **YAML Column-Level Changes:**\n`;
       for (const change of columnChanges) {
         summary += `\n- \`${change.file}\`\n`;
-
-        const oldCols = extractColumnsFromYaml(path.join(basePath, change.file));
-        const newCols = extractColumnsFromYaml(path.join(headPath, change.file));
-
-        const oldColNames = Object.keys(oldCols);
-        const newColNames = Object.keys(newCols);
-
-        summary += `  - 📋 All Old Columns: ${oldColNames.length > 0 ? oldColNames.join(", ") : "None"}\n`;
-        summary += `  - 📋 All New Columns: ${newColNames.length > 0 ? newColNames.join(", ") : "None"}\n`;
-
         if (change.added.length > 0) {
           summary += `  - ➕ Added: ${change.added.join(", ")}\n`;
         }
