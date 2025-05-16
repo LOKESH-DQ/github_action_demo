@@ -76,13 +76,13 @@ jobs:
         with:
           fetch-depth: 0
 
-      # Checkout the base branch code into a separate folder 'base'
-      - name: Checkout base branch code
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.base.ref }}
-          path: base
-          fetch-depth: 0
+      # # Checkout the base branch code into a separate folder 'base'
+      # - name: Checkout base branch code
+      #   uses: actions/checkout@v4
+      #   with:
+      #     ref: ${{ github.event.pull_request.base.ref }}
+      #     path: base
+      #     fetch-depth: 0
 
       # Get changed files between base and head
       - name: Get changed DBT files
