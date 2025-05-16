@@ -8,7 +8,7 @@ const yaml = require("js-yaml");
 const clientId = core.getInput("api_client_id");
 const clientSecret = core.getInput("api_client_secret");
 const changedFilesList = core.getInput("changed_files_list"); // comma separated list
-const githubToken = core.getInput("github_token") || core.getInput("GITHUB_TOKEN");
+const githubToken = core.getInput("GITHUB_TOKEN");
 
 const getChangedFiles = async () => {
   if (changedFilesList) {
@@ -69,56 +69,55 @@ const getLineageData = async (asset_id, connection_id) => {
   return response.data.response.data.tables;
 };
 
-const extractColumnsWithMetadata = (filePath) => {
+const extractColumnsFromYaml = (filePath) => {
   try {
     const content = fs.readFileSync(filePath, "utf8");
     const doc = yaml.load(content);
     const models = doc.models || [];
-    const columnsMap = new Map();
+    const columns = {};
 
     models.forEach(model => {
       (model.columns || []).forEach(col => {
         if (col.name) {
-          columnsMap.set(col.name, col);
+          columns[col.name] = col;
         }
       });
     });
 
-    return columnsMap;
+    return columns;
   } catch (err) {
     console.warn(`Failed to read or parse ${filePath}:`, err.message);
-    return new Map();
+    return {};
   }
 };
 
-const compareColumnsDetailed = (oldColsMap, newColsMap) => {
+const compareColumns = (oldCols, newCols) => {
   const added = [];
   const removed = [];
-  const updated = [];
+  const modified = [];
 
-  for (const [colName, newCol] of newColsMap.entries()) {
-    if (!oldColsMap.has(colName)) {
-      added.push(colName);
-    } else {
-      const oldCol = oldColsMap.get(colName);
-      const oldDesc = oldCol.description || "";
-      const newDesc = newCol.description || "";
-      const oldTests = JSON.stringify(oldCol.tests || []);
-      const newTests = JSON.stringify(newCol.tests || []);
+  const oldKeys = Object.keys(oldCols);
+  const newKeys = Object.keys(newCols);
 
-      if (oldDesc !== newDesc || oldTests !== newTests) {
-        updated.push(colName);
-      }
+  for (const key of newKeys) {
+    if (!oldCols[key]) {
+      added.push(key);
+    } else if (JSON.stringify(oldCols[key]) !== JSON.stringify(newCols[key])) {
+      modified.push({
+        name: key,
+        old: oldCols[key],
+        new: newCols[key],
+      });
     }
   }
 
-  for (const colName of oldColsMap.keys()) {
-    if (!newColsMap.has(colName)) {
-      removed.push(colName);
+  for (const key of oldKeys) {
+    if (!newCols[key]) {
+      removed.push(key);
     }
   }
 
-  return { added, removed, updated };
+  return { added, removed, modified };
 };
 
 const run = async () => {
@@ -148,37 +147,30 @@ const run = async () => {
         connection_name: asset.connection_name,
       }));
 
-    const downstreamAssets = [];
-
+    const downstreamAssetsMap = {};
     for (const asset of matchedAssets) {
       const lineageTables = await getLineageData(asset.asset_id, asset.connection_id);
       const downstream = lineageTables.filter(table => table.flow === "downstream");
       downstream.forEach(table => {
-        downstreamAssets.push({
-          name: table.name,
-          connection_name: table.connection_name,
-        });
+        if (!downstreamAssetsMap[table.connection_name]) {
+          downstreamAssetsMap[table.connection_name] = [];
+        }
+        downstreamAssetsMap[table.connection_name].push(table.name);
       });
     }
 
-    // Detect column-level changes for YAML files with detailed added/removed/updated
     const columnChanges = [];
     for (const file of changedFiles.filter(f => f.endsWith(".yml"))) {
-      // Assuming base versions are in 'base/' folder in the repo root (adjust if different)
       const basePath = path.join("base", file);
-      const headPath = file; // current changed file in working directory
-
-      const baseColumns = fs.existsSync(basePath) ? extractColumnsWithMetadata(basePath) : new Map();
-      const headColumns = fs.existsSync(headPath) ? extractColumnsWithMetadata(headPath) : new Map();
-
-      const { added, removed, updated } = compareColumnsDetailed(baseColumns, headColumns);
-
-      if (added.length > 0 || removed.length > 0 || updated.length > 0) {
-        columnChanges.push({ file, added, removed, updated });
+      const headPath = file;
+      const baseColumns = fs.existsSync(basePath) ? extractColumnsFromYaml(basePath) : {};
+      const headColumns = fs.existsSync(headPath) ? extractColumnsFromYaml(headPath) : {};
+      const { added, removed, modified } = compareColumns(baseColumns, headColumns);
+      if (added.length > 0 || removed.length > 0 || modified.length > 0) {
+        columnChanges.push({ file, added, removed, modified });
       }
     }
 
-    // Build markdown summary
     let summary = `🧠 **Impact Analysis Summary**\n\n`;
 
     summary += `\n📄 **Changed DBT Models:**\n`;
@@ -191,12 +183,15 @@ const run = async () => {
     }
 
     summary += `\n🔗 **Downstream Assets:**\n`;
-    if (downstreamAssets.length === 0) {
+    if (Object.keys(downstreamAssetsMap).length === 0) {
       summary += `- None found\n`;
     } else {
-      downstreamAssets.forEach(asset => {
-        summary += `- ${asset.name} (${asset.connection_name})\n`;
-      });
+      for (const [conn, assets] of Object.entries(downstreamAssetsMap)) {
+        summary += `- ${conn}:\n`;
+        assets.forEach(name => {
+          summary += `  - ${name}\n`;
+        });
+      }
     }
 
     if (columnChanges.length > 0) {
@@ -209,8 +204,13 @@ const run = async () => {
         if (change.removed.length > 0) {
           summary += `  - ➖ Removed: ${change.removed.join(", ")}\n`;
         }
-        if (change.updated.length > 0) {
-          summary += `  - ✏️ Updated: ${change.updated.join(", ")}\n`;
+        if (change.modified.length > 0) {
+          summary += `  - ✏️ Modified Columns:\n`;
+          change.modified.forEach(mod => {
+            summary += `    - ${mod.name}\n`;
+            summary += `      - old: ${JSON.stringify(mod.old)}\n`;
+            summary += `      - new: ${JSON.stringify(mod.new)}\n`;
+          });
         }
       }
     }
@@ -236,7 +236,7 @@ const run = async () => {
       .write();
 
     core.setOutput("impact_markdown", summary);
-    core.setOutput("downstream_assets", JSON.stringify(downstreamAssets));
+    core.setOutput("downstream_assets", JSON.stringify(downstreamAssetsMap));
 
   } catch (error) {
     core.setFailed(`Error: ${error.message}`);

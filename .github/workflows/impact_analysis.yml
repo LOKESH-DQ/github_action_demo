@@ -70,11 +70,21 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
+      # Checkout the PR branch (head)
+      - name: Checkout PR code (head)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      # Checkout the base branch code into a separate folder 'base'
+      - name: Checkout base branch code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+          path: base
+          fetch-depth: 0
+
+      # Get changed files between base and head
       - name: Get changed DBT files
         id: changes
         uses: tj-actions/changed-files@v39
@@ -86,6 +96,7 @@ jobs:
           include_renamed: true
           separator: ","
 
+      # Run your custom impact analysis action
       - name: Run DQLabs Impact Analysis
         id: impact-analysis
         uses: LOKESH-DQ/github_action_demo@main
@@ -95,9 +106,11 @@ jobs:
           changed_files_list: ${{ steps.changes.outputs.all_changed_files }},${{ steps.changes.outputs.removed_files }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
+      # Show summary logs for debugging
       - name: Show Summary in Logs
-        run: echo "${{ steps.impact-analysis.outputs.impact_summary }}"
+        run: echo "${{ steps.impact-analysis.outputs.impact_markdown }}"
 
+      # Debug changed files info
       - name: Debug changed files
         run: |
           echo "All files: ${{ steps.changes.outputs.all_files }}"
