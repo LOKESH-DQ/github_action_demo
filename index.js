@@ -184,7 +184,9 @@ const run = async () => {
       const headCols = extractColumnsFromSQL(headContent);
 
       const added = headCols.filter(col => !baseCols.includes(col));
+      console.log("added", added);
       const removed = baseCols.filter(col => !headCols.includes(col));
+      console.log("removed", removed);
 
       if (added.length > 0 || removed.length > 0) {
         sqlColumnChanges.push({ file, added, removed });
@@ -192,6 +194,25 @@ const run = async () => {
     }
 
     let summary = `🧠 **Impact Analysis Summary**\n\n`;
+
+    for (const file of changedFiles.filter(f => f.endsWith(".sql"))) {
+      const baseContent = getFileContent("base", file);
+      const headContent = getFileContent("HEAD", file);
+
+      if (!headContent) continue;
+
+      const baseCols = baseContent ? extractColumnsFromSQL(baseContent) : [];
+      const headCols = extractColumnsFromSQL(headContent);
+
+      const added = headCols.filter(col => !baseCols.includes(col));
+      summary += `added columns : ${added.join(", ")}\n`;
+      const removed = baseCols.filter(col => !headCols.includes(col));
+      summary += `removed columns : ${removed.join(", ")}\n`;
+
+      if (added.length > 0 || removed.length > 0) {
+        sqlColumnChanges.push({ file, added, removed });
+      }
+    }
 
     summary += `\n📄 **Changed DBT Models:**\n`;
     if (changedModels.length === 0) {
