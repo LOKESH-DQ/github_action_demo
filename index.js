@@ -183,7 +183,7 @@ const run = async () => {
       const baseCols = baseContent ? extractColumnsFromSQL(baseContent) : [];
       const headCols = extractColumnsFromSQL(headContent);
 
-      summary += `  - 📋 All Old Columns: ${baseCols.join(", ")}\n`;
+      let summary = `  - 📋 All Old Columns: ${baseCols.join(", ")}\n`;
       summary += `  - 📋 All New Columns: ${headCols.join(", ")}\n`;
 
       const added = headCols.filter(col => !baseCols.includes(col));
@@ -194,7 +194,7 @@ const run = async () => {
       }
     }
 
-    let summary = `🧠 **Impact Analysis Summary**\n\n`;
+    summary += `🧠 **Impact Analysis Summary**\n\n`;
 
     summary += `\n📄 **Changed DBT Models:**\n`;
     if (changedModels.length === 0) {
