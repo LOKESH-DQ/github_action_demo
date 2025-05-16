@@ -172,29 +172,6 @@ const run = async () => {
       }
     }
 
-    // SQL file column comparison
-    const sqlColumnChanges = [];
-    for (const file of changedFiles.filter(f => f.endsWith(".sql"))) {
-      const baseSha = process.env.GITHUB_BASE_SHA || github.event.pull_request.base.sha;
-      const headSha = process.env.GITHUB_HEAD_SHA || github.event.pull_request.head.sha;
-      const baseContent = getFileContent(baseSha, file);
-      const headContent = getFileContent(headSha, file);
-
-      if (!headContent) continue;
-
-      const baseCols = baseContent ? extractColumnsFromSQL(baseContent) : [];
-      const headCols = extractColumnsFromSQL(headContent);
-
-      const added = headCols.filter(col => !baseCols.includes(col));
-      console.log("added", added);
-      const removed = baseCols.filter(col => !headCols.includes(col));
-      console.log("removed", removed);
-
-      if (added.length > 0 || removed.length > 0) {
-        sqlColumnChanges.push({ file, added, removed });
-      }
-    }
-
     let summary = `🧠 **Impact Analysis Summary**\n\n`;
 
     for (const file of changedFiles.filter(f => f.endsWith(".sql"))) {
