@@ -84,7 +84,7 @@ jobs:
             **/*.yml
           include_removed: true
           include_renamed: true
-          separator: " " 
+          separator: ","  # Use comma separator for easier split
 
       - name: Run DQLabs Impact Analysis
         id: impact-analysis
@@ -92,11 +92,11 @@ jobs:
         with:
           api_client_id: ${{ secrets.DQLABS_API_CLIENT_ID }}
           api_client_secret: ${{ secrets.DQLABS_API_CLIENT_SECRET }}
-          changed_files_list: "${{ steps.changes.outputs.all_changed_files }} ${{ steps.changes.outputs.removed_files }}"
+          changed_files_list: ${{ steps.changes.outputs.all_changed_files }},${{ steps.changes.outputs.removed_files }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Show Summary in Logs
-        run: echo "${{ steps.impact-analysis.outputs.impact_summary }}"
+        run: echo "${{ steps.impact-analysis.outputs.impact_markdown }}"
 
       - name: Debug changed files
         run: |
@@ -106,4 +106,4 @@ jobs:
           echo "Removed files: ${{ steps.changes.outputs.removed_files }}"
           echo "Renamed files: ${{ steps.changes.outputs.renamed_files }}"
           echo "All changed files: ${{ steps.changes.outputs.all_changed_files }}"
-          echo "Combined changed_files_list: ${{ steps.changes.outputs.all_changed_files }} ${{ steps.changes.outputs.removed_files }}"
+          echo "Combined changed_files_list: ${{ steps.changes.outputs.all_changed_files }},${{ steps.changes.outputs.removed_files }}"

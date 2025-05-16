@@ -6,12 +6,16 @@ const path = require("path");
 
 const clientId = core.getInput("api_client_id");
 const clientSecret = core.getInput("api_client_secret");
-const changedFilesList = core.getInput("changed_files_list");  // Optional
+const changedFilesList = core.getInput("changed_files_list");  // comma separated list
 const githubToken = core.getInput("GITHUB_TOKEN");
 
 const getChangedFiles = async () => {
   if (changedFilesList) {
-    return changedFilesList.split(",").map(f => f.trim());
+    // Split by comma and trim whitespace
+    return changedFilesList
+      .split(",")
+      .map(f => f.trim())
+      .filter(f => f.length > 0);
   }
 
   const eventPath = process.env.GITHUB_EVENT_PATH;
@@ -73,6 +77,7 @@ const run = async () => {
 
     const changedFiles = await getChangedFiles();
 
+    // Filter for DBT model files and get unique model names (basename without extension)
     const changedModels = changedFiles
       .filter((file) => file.endsWith(".yml") || file.endsWith(".sql"))
       .map((file) => path.basename(file, path.extname(file)))
