@@ -173,6 +173,7 @@ const run = async () => {
     }
 
     let summary = `🧠 **Impact Analysis Summary**\n\n`;
+    const sqlColumnChanges = [];
 
     for (const file of changedFiles.filter(f => f.endsWith(".sql"))) {
       const baseContent = getFileContent("base", file);
