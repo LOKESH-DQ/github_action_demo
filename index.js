@@ -198,7 +198,6 @@ const run = async () => {
     for (const file of changedFiles.filter(f => f.endsWith(".sql"))) {
       const baseContent = getFileContent("base", file);
       const headContent = getFileContent("HEAD", file);
-      summary += `headContent : ${headContent.join(", ")}\n`;
       const ref = "HEAD";
       const ref2 = "base";
       summary += `head is ${ref}\n`;
@@ -207,7 +206,7 @@ const run = async () => {
 
       if (!headContent) continue;
       if (baseContent) {
-        summary += `baseContent is ${baseContent}\n`;
+        summary += `baseContent is these \n`;
       }
 
       const baseCols = baseContent ? extractColumnsFromSQL(baseContent) : [];
