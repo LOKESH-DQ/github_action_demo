@@ -197,7 +197,9 @@ const run = async () => {
 
     for (const file of changedFiles.filter(f => f.endsWith(".sql"))) {
       const baseContent = getFileContent("base", file);
+      summary += `baseContent : ${baseContent.join(", ")}\n`;
       const headContent = getFileContent("HEAD", file);
+      summary += `headContent : ${headContent.join(", ")}\n`;
       const ref = "HEAD";
       const ref2 = "base";
       summary += `head is ${ref}\n`;
