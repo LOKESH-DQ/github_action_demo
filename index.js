@@ -202,7 +202,9 @@ const run = async () => {
       if (!headContent) continue;
 
       const baseCols = baseContent ? extractColumnsFromSQL(baseContent) : [];
+      summary += `base columns : ${baseCols.join(", ")}\n`;
       const headCols = extractColumnsFromSQL(headContent);
+      summary += `head columns : ${headCols.join(", ")}\n`;
 
       const added = headCols.filter(col => !baseCols.includes(col));
       summary += `added columns : ${added.join(", ")}\n`;
