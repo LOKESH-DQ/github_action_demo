@@ -8,7 +8,7 @@ const yaml = require("js-yaml");
 const clientId = core.getInput("api_client_id");
 const clientSecret = core.getInput("api_client_secret");
 const changedFilesList = core.getInput("changed_files_list"); // comma separated list
-const githubToken = core.getInput("github_token");
+const githubToken = core.getInput("github_token") || core.getInput("GITHUB_TOKEN");
 
 const getChangedFiles = async () => {
   if (changedFilesList) {
@@ -69,30 +69,56 @@ const getLineageData = async (asset_id, connection_id) => {
   return response.data.response.data.tables;
 };
 
-const extractColumnsFromYaml = (filePath) => {
+const extractColumnsWithMetadata = (filePath) => {
   try {
     const content = fs.readFileSync(filePath, "utf8");
     const doc = yaml.load(content);
     const models = doc.models || [];
-    const columns = new Set();
+    const columnsMap = new Map();
 
     models.forEach(model => {
       (model.columns || []).forEach(col => {
-        if (col.name) columns.add(col.name);
+        if (col.name) {
+          columnsMap.set(col.name, col);
+        }
       });
     });
 
-    return Array.from(columns);
+    return columnsMap;
   } catch (err) {
     console.warn(`Failed to read or parse ${filePath}:`, err.message);
-    return [];
+    return new Map();
   }
 };
 
-const compareColumns = (oldCols, newCols) => {
-  const added = newCols.filter(col => !oldCols.includes(col));
-  const removed = oldCols.filter(col => !newCols.includes(col));
-  return { added, removed };
+const compareColumnsDetailed = (oldColsMap, newColsMap) => {
+  const added = [];
+  const removed = [];
+  const updated = [];
+
+  for (const [colName, newCol] of newColsMap.entries()) {
+    if (!oldColsMap.has(colName)) {
+      added.push(colName);
+    } else {
+      const oldCol = oldColsMap.get(colName);
+      const oldDesc = oldCol.description || "";
+      const newDesc = newCol.description || "";
+      const oldTests = JSON.stringify(oldCol.tests || []);
+      const newTests = JSON.stringify(newCol.tests || []);
+
+      if (oldDesc !== newDesc || oldTests !== newTests) {
+        updated.push(colName);
+      }
+    }
+  }
+
+  for (const colName of oldColsMap.keys()) {
+    if (!newColsMap.has(colName)) {
+      removed.push(colName);
+    }
+  }
+
+  return { added, removed, updated };
 };
 
 const run = async () => {
@@ -135,16 +161,20 @@ const run = async () => {
       });
     }
 
-    // Detect column-level changes for YAML files
+    // Detect column-level changes for YAML files with detailed added/removed/updated
     const columnChanges = [];
     for (const file of changedFiles.filter(f => f.endsWith(".yml"))) {
+      // Assuming base versions are in 'base/' folder in the repo root (adjust if different)
       const basePath = path.join("base", file);
-      const headPath = file; // assume file in working dir is head version
-      const baseColumns = fs.existsSync(basePath) ? extractColumnsFromYaml(basePath) : [];
-      const headColumns = fs.existsSync(headPath) ? extractColumnsFromYaml(headPath) : [];
-      const { added, removed } = compareColumns(baseColumns, headColumns);
-      if (added.length > 0 || removed.length > 0) {
-        columnChanges.push({ file, added, removed });
+      const headPath = file; // current changed file in working directory
+
+      const baseColumns = fs.existsSync(basePath) ? extractColumnsWithMetadata(basePath) : new Map();
+      const headColumns = fs.existsSync(headPath) ? extractColumnsWithMetadata(headPath) : new Map();
+
+      const { added, removed, updated } = compareColumnsDetailed(baseColumns, headColumns);
+
+      if (added.length > 0 || removed.length > 0 || updated.length > 0) {
+        columnChanges.push({ file, added, removed, updated });
       }
     }
 
@@ -178,6 +208,9 @@ const run = async () => {
         }
         if (change.removed.length > 0) {
           summary += `  - ➖ Removed: ${change.removed.join(", ")}\n`;
+        }
+        if (change.updated.length > 0) {
+          summary += `  - ✏️ Updated: ${change.updated.join(", ")}\n`;
         }
       }
     }
