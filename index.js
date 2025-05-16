@@ -176,13 +176,10 @@ const run = async () => {
     const sqlColumnChanges = [];
 
     for (const file of changedFiles.filter(f => f.endsWith(".sql"))) {
-      
-      const baseContent = getFileContent("base", file);
+      const baseSha = process.env.GITHUB_BASE_SHA || github.context.payload.pull_request?.base?.sha;
+      const baseContent = getFileContent(baseSha, file);
       const headSha = process.env.GITHUB_HEAD_SHA || github.context.payload.pull_request?.head?.sha;
       const headContent = getFileContent(headSha, file);
-      const ref = "HEAD";
-      const ref2 = "base";
-      const baseSha = process.env.GITHUB_BASE_SHA || github.context.payload.pull_request?.base?.sha;
 
       summary += `headsha---- is ${headSha}\n`;
       summary += `basesha---- is ${baseSha}\n`;
