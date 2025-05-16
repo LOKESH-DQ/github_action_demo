@@ -119,5 +119,6 @@ jobs:
           echo "Modified files: ${{ steps.changes.outputs.modified_files }}"
           echo "Removed files: ${{ steps.changes.outputs.removed_files }}"
           echo "Renamed files: ${{ steps.changes.outputs.renamed_files }}"
-          echo "All changed files: ${{ steps.changes.outputs }}"
+          echo "All deleted_files	 files: ${{ steps.changes.outputs.deleted_files }}"
+          echo "All deleted_files	 files: ${{ steps.changes.outputs }}"
           echo "Combined changed_files_list: ${{ steps.changes.outputs.all_changed_files }},${{ steps.changes.outputs.removed_files }}"
