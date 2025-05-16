@@ -63,7 +63,7 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write  # 🔥 Required for commenting on PRs
+  pull-requests: write  # Required to comment on PRs
 
 jobs:
   impact-analysis:
@@ -73,20 +73,22 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Fetch all history for all branches and tags
+          fetch-depth: 0  # Fetch full git history for PR diff
 
       - name: Get changed DBT files
         id: changes
-        uses: step-security/changed-files@v1
+        uses: tj-actions/changed-files@v39
         with:
           files: |
             **/*.sql
             **/*.yml
           include_removed: true
           include_renamed: true
+          base: ${{ github.event.pull_request.base.sha }}
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Run DQLabs Impact Analysis
-        id: impact-analysis  # 🔄 Added to expose outputs
+        id: impact-analysis
         uses: LOKESH-DQ/github_action_demo@main
         with:
           api_client_id: ${{ secrets.DQLABS_API_CLIENT_ID }}
@@ -96,7 +98,7 @@ jobs:
 
       - name: Show Summary in Logs
         run: echo "${{ steps.impact-analysis.outputs.impact_summary }}"
-      
+
       - name: Debug changed files
         run: |
           echo "All files: ${{ steps.changes.outputs.all_files }}"
@@ -105,4 +107,4 @@ jobs:
           echo "Removed files: ${{ steps.changes.outputs.removed_files }}"
           echo "Renamed files: ${{ steps.changes.outputs.renamed_files }}"
           echo "All changed files: ${{ steps.changes.outputs.all_changed_files }}"
-          echo "Changed files list: ${{ steps.changes.outputs.all_changed_files }} ${{ steps.changes.outputs.removed_files }}"
+          echo "Combined changed_files_list: ${{ steps.changes.outputs.all_changed_files }} ${{ steps.changes.outputs.removed_files }}"
