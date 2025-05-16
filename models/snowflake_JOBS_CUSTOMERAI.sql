@@ -8,8 +8,6 @@
 
 WITH customer_data AS (
 SELECT
-o.ORDER_ID,
-o.CUSTOMER_ID,
 o.ORDER_DATE,
 o.STATUS,
 c.FIRST_NAME,
@@ -29,6 +27,7 @@ CUSTOMER_ID,
 ORDER_DATE,
 STATUS,
 FIRST_NAME,
+lokesh,
 LAST_NAME
 FROM
 customer_data
