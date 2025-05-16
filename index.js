@@ -3,15 +3,15 @@ const github = require("@actions/github");
 const axios = require("axios");
 const fs = require("fs");
 const path = require("path");
+const yaml = require("js-yaml");
 
 const clientId = core.getInput("api_client_id");
 const clientSecret = core.getInput("api_client_secret");
-const changedFilesList = core.getInput("changed_files_list");  // comma separated list
-const githubToken = core.getInput("GITHUB_TOKEN");
+const changedFilesList = core.getInput("changed_files_list"); // comma separated list
+const githubToken = core.getInput("github_token");
 
 const getChangedFiles = async () => {
   if (changedFilesList) {
-    // Split by comma and trim whitespace
     return changedFilesList
       .split(",")
       .map(f => f.trim())
@@ -69,6 +69,32 @@ const getLineageData = async (asset_id, connection_id) => {
   return response.data.response.data.tables;
 };
 
+const extractColumnsFromYaml = (filePath) => {
+  try {
+    const content = fs.readFileSync(filePath, "utf8");
+    const doc = yaml.load(content);
+    const models = doc.models || [];
+    const columns = new Set();
+
+    models.forEach(model => {
+      (model.columns || []).forEach(col => {
+        if (col.name) columns.add(col.name);
+      });
+    });
+
+    return Array.from(columns);
+  } catch (err) {
+    console.warn(`Failed to read or parse ${filePath}:`, err.message);
+    return [];
+  }
+};
+
+const compareColumns = (oldCols, newCols) => {
+  const added = newCols.filter(col => !oldCols.includes(col));
+  const removed = oldCols.filter(col => !newCols.includes(col));
+  return { added, removed };
+};
+
 const run = async () => {
   try {
     const eventPath = process.env.GITHUB_EVENT_PATH;
@@ -77,21 +103,19 @@ const run = async () => {
 
     const changedFiles = await getChangedFiles();
 
-    // Filter for DBT model files and get unique model names (basename without extension)
     const changedModels = changedFiles
-      .filter((file) => file.endsWith(".yml") || file.endsWith(".sql"))
-      .map((file) => path.basename(file, path.extname(file)))
+      .filter(file => file.endsWith(".yml") || file.endsWith(".sql"))
+      .map(file => path.basename(file, path.extname(file)))
       .filter((name, index, self) => name && self.indexOf(name) === index);
 
     const jobAssets = await getJobAssets();
 
     const matchedAssets = jobAssets
-      .filter(
-        (asset) =>
-          changedModels.includes(asset.name) &&
-          asset.connection_type === "dbt"
+      .filter(asset =>
+        changedModels.includes(asset.name) &&
+        asset.connection_type === "dbt"
       )
-      .map((asset) => ({
+      .map(asset => ({
         name: asset.name,
         asset_id: asset.asset_id,
         connection_id: asset.connection_id,
@@ -102,9 +126,8 @@ const run = async () => {
 
     for (const asset of matchedAssets) {
       const lineageTables = await getLineageData(asset.asset_id, asset.connection_id);
-      const downstream = lineageTables.filter((table) => table.flow === "downstream");
-
-      downstream.forEach((table) => {
+      const downstream = lineageTables.filter(table => table.flow === "downstream");
+      downstream.forEach(table => {
         downstreamAssets.push({
           name: table.name,
           connection_name: table.connection_name,
@@ -112,32 +135,55 @@ const run = async () => {
       });
     }
 
+    // Detect column-level changes for YAML files
+    const columnChanges = [];
+    for (const file of changedFiles.filter(f => f.endsWith(".yml"))) {
+      const basePath = path.join("base", file);
+      const headPath = file; // assume file in working dir is head version
+      const baseColumns = fs.existsSync(basePath) ? extractColumnsFromYaml(basePath) : [];
+      const headColumns = fs.existsSync(headPath) ? extractColumnsFromYaml(headPath) : [];
+      const { added, removed } = compareColumns(baseColumns, headColumns);
+      if (added.length > 0 || removed.length > 0) {
+        columnChanges.push({ file, added, removed });
+      }
+    }
+
     // Build markdown summary
     let summary = `🧠 **Impact Analysis Summary**\n\n`;
 
-    // Print filtered changed models
     summary += `\n📄 **Changed DBT Models:**\n`;
     if (changedModels.length === 0) {
       summary += `- None\n`;
     } else {
-      changedModels.forEach((model) => {
+      changedModels.forEach(model => {
         summary += `- ${model}\n`;
       });
     }
 
-    // Print downstream assets
     summary += `\n🔗 **Downstream Assets:**\n`;
     if (downstreamAssets.length === 0) {
       summary += `- None found\n`;
     } else {
-      downstreamAssets.forEach((asset) => {
+      downstreamAssets.forEach(asset => {
         summary += `- ${asset.name} (${asset.connection_name})\n`;
       });
     }
 
+    if (columnChanges.length > 0) {
+      summary += `\n🧬 **Column-Level Changes:**\n`;
+      for (const change of columnChanges) {
+        summary += `\n- \`${change.file}\`\n`;
+        if (change.added.length > 0) {
+          summary += `  - ➕ Added: ${change.added.join(", ")}\n`;
+        }
+        if (change.removed.length > 0) {
+          summary += `  - ➖ Removed: ${change.removed.join(", ")}\n`;
+        }
+      }
+    }
+
     console.log(summary);
 
-    // Post comment on PR (if PR context exists)
     const octokit = github.getOctokit(githubToken);
     const context = github.context;
 
@@ -152,12 +198,10 @@ const run = async () => {
       core.info("No pull request found in the context, skipping comment post.");
     }
 
-    // Write summary to GitHub Actions UI
     await core.summary
       .addRaw(summary)
       .write();
 
-    // Set outputs
     core.setOutput("impact_markdown", summary);
     core.setOutput("downstream_assets", JSON.stringify(downstreamAssets));
 

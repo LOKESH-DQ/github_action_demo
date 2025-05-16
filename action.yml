@@ -42,8 +42,11 @@ inputs:
     required: true
 
 outputs:
-  impact_summary:
-    description: "Structured Impact Analysis report (downstream impact and column changes)"
+  impact_markdown:
+    description: "Markdown summary of the impact analysis"
+
+  downstream_assets:
+    description: "JSON string of downstream assets"
 
 runs:
   using: "node16"
