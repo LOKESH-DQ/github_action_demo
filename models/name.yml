@@ -3,11 +3,11 @@ model:
   attributes:
     firstName:
       type: string
-    lastName:
+    lastNames:
       type: string
     email:
       type: string
-    createdAt:
-      type: date
     updatedAt:
+      type: date
+    createdAt:
       type: date
