@@ -214,24 +214,9 @@ const run = async () => {
       }
     }
 
-
-    summary += `\n🔗 **Basecolumns:**\n`;
-    const baseContent = getFileContent("base", file);
-    const headContent = getFileContent("HEAD", file);
-
-    const baseCols = baseContent ? extractColumnsFromSQL(baseContent) : [];
-    const headCols = extractColumnsFromSQL(headContent);
-
-    const added = headCols.filter(col => !baseCols.includes(col));
-    const removed = baseCols.filter(col => !headCols.includes(col));
-
-    summary += `- Added length: ${added.length}\n`;
-    summary += `- Added: ${added.join(", ")}\n`;
-    summary += `- Removed length: ${removed.length}\n`;
-    summary += `- Removed: ${removed.join(", ")}\n`;
-
     if (columnChanges.length > 0) {
       summary += `\n🧬 **YAML Column-Level Changes:**\n`;
+      summary += `changed columns are b: ${columnChanges}\n`;
       for (const change of columnChanges) {
         summary += `\n- \`${change.file}\`\n`;
         if (change.added.length > 0) {
