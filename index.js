@@ -184,7 +184,9 @@ const run = async () => {
       const headCols = extractColumnsFromSQL(headContent);
 
       const added = headCols.filter(col => !baseCols.includes(col));
+      console.log("addedlokesh", added);
       const removed = baseCols.filter(col => !headCols.includes(col));
+      console.log("removedlokesh", removed);
 
       if (added.length > 0 || removed.length > 0) {
         sqlColumnChanges.push({ file, added, removed });
