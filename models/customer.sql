@@ -1,8 +1,6 @@
 model:
   name: Customer
   attributes:
-    firstName:
-      type: string
     lastName:
       type: string
     email:
