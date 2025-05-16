@@ -199,12 +199,6 @@ const run = async () => {
     } else {
       changedModels.forEach(model => {
         summary += `- ${model}\n`;
-
-        const baseCols = modelBaseColumns[model] || [];
-        const headCols = modelHeadColumns[model] || [];
-
-        summary += `  \n  // Base Columns: \`${baseCols.join(", ")}\`\n`;
-        summary += `  // Head Columns: \`${headCols.join(", ")}\`\n`;
       });
     }
 
@@ -224,6 +218,16 @@ const run = async () => {
       summary += `\n🧬 **YAML Column-Level Changes:**\n`;
       for (const change of columnChanges) {
         summary += `\n- \`${change.file}\`\n`;
+
+        const oldCols = extractColumnsFromYaml(path.join(basePath, change.file));
+        const newCols = extractColumnsFromYaml(path.join(headPath, change.file));
+
+        const oldColNames = Object.keys(oldCols);
+        const newColNames = Object.keys(newCols);
+
+        summary += `  - 📋 All Old Columns: ${oldColNames.length > 0 ? oldColNames.join(", ") : "None"}\n`;
+        summary += `  - 📋 All New Columns: ${newColNames.length > 0 ? newColNames.join(", ") : "None"}\n`;
+
         if (change.added.length > 0) {
           summary += `  - ➕ Added: ${change.added.join(", ")}\n`;
         }
