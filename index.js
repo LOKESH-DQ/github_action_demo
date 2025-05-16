@@ -178,7 +178,7 @@ const run = async () => {
     for (const file of changedFiles.filter(f => f.endsWith(".sql"))) {
       
       const baseContent = getFileContent("base", file);
-      const headContent = getFileContent("HEAD", file);
+      const headContent = getFileContent(headSha, file);
       const ref = "HEAD";
       const ref2 = "base";
       const baseSha = process.env.GITHUB_BASE_SHA || github.context.payload.pull_request?.base?.sha;
