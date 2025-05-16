@@ -84,8 +84,7 @@ jobs:
             **/*.yml
           include_removed: true
           include_renamed: true
-          base: ${{ github.event.pull_request.base.sha }}
-          ref: ${{ github.event.pull_request.head.sha }}
+          separator: " " 
 
       - name: Run DQLabs Impact Analysis
         id: impact-analysis
