@@ -87,7 +87,7 @@ jobs:
       # Get changed files between base and head
       - name: Get changed DBT files
         id: changes
-        uses: tj-actions/changed-files@v39
+        uses: tj-actions/changed-files@v46
         with:
           files: |
             **/*.sql
@@ -110,6 +110,7 @@ jobs:
       - name: Show Summary in Logs
         run: echo "${{ steps.impact-analysis.outputs.impact_markdown }}"
 
+
       # Debug changed files info
       - name: Debug changed files
         run: |
@@ -118,5 +119,5 @@ jobs:
           echo "Modified files: ${{ steps.changes.outputs.modified_files }}"
           echo "Removed files: ${{ steps.changes.outputs.removed_files }}"
           echo "Renamed files: ${{ steps.changes.outputs.renamed_files }}"
-          echo "All changed files: ${{ steps.changes.outputs.all_changed_files }}"
+          echo "All changed files: ${{ steps.changes.outputs }}"
           echo "Combined changed_files_list: ${{ steps.changes.outputs.all_changed_files }},${{ steps.changes.outputs.removed_files }}"
