@@ -141,12 +141,12 @@ const run = async () => {
     const tasks = await getTasks();
 
     const matchedTasks = tasks
-      .filter(task =>
-        changedModels.some(
-          cm => cm.model === task.name // Match both model and job
-        ) &&
-        task.connection_type === "dbt"
-      )
+      .filter(task => {
+        return changedModels.some(cm =>
+          cm.model.trim().toLowerCase() === task.name.trim().toLowerCase() &&
+          cm.job.trim().toLowerCase() === task.job_name.trim().toLowerCase()
+        ) && task.connection_type === "dbt";
+      })
       .map(task => ({
         name: task.name,
         asset_id: task.asset_id,
