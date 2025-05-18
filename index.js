@@ -143,7 +143,7 @@ const run = async () => {
     const matchedTasks = tasks
       .filter(task =>
         changedModels.some(
-          cm => cm.model === task.name && cm.job === task.job_name // Match both model and job
+          cm => cm.model === task.name // Match both model and job
         ) &&
         task.connection_type === "dbt"
       )
@@ -188,7 +188,9 @@ const run = async () => {
       summary += `- Connection ID: ${task.connection_id}\n`;
       summary += `- Asset ID: ${task.asset_id}\n`;
       summary += `- Connection Name: ${task.connection_name}\n`;
-      summary += `- Entity: ${task.entity}\n`;
+      summary += `- Job Name: ${task.job_name}\n`;
+      summary += `- Task ID: ${task.task_id}\n`;
+      summary += `- Name: ${task.name}\n`;
     }
 
 
