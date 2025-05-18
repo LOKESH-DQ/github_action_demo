@@ -35,10 +35,9 @@ const getChangedFiles = async () => {
   return Array.from(changedFiles);
 };
 
-const baseurl = "http://44.238.88.190:8000/api/";
 
 const getTasks = async () => {
-  const taskUrl = `${baseurl}task/`;
+  const taskUrl = "http://44.238.88.190:8000/api/pipeline/task/";
   const response = await axios.post(
     taskUrl,
     {},
@@ -53,7 +52,7 @@ const getTasks = async () => {
 };
 
 const getLineageData = async (asset_id, connection_id, entity) => {
-  const lineageUrl = `${baseurl}lineage/`;
+  const lineageUrl = "http://44.238.88.190:8000/api/lineage/";
   const body = {
     asset_id,
     connection_id,
