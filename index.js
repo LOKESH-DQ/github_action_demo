@@ -139,6 +139,9 @@ const run = async () => {
       })
 
     const tasks = await getTasks();
+    function normalize(str) {
+      return (str || "").trim().toLowerCase();
+}
 
     const matchedTasks = tasks
       .filter(task => {
