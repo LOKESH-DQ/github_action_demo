@@ -186,6 +186,7 @@ const run = async () => {
     for (const file of changedModels) {
       summary += `\n**Changed DBT Model:-- ${file.model}\n`;
       summary += `- fghjkjhgfdfghjhgfdjJob:-- ${file.job}\n`;
+    }
 
     for (const task of matchedTasks) {
       summary += `\n🔍 **Task:** ${task.name}\n`;
@@ -303,6 +304,6 @@ const run = async () => {
   } catch (error) {
     core.setFailed(`Error: ${error.message}`);
   }
-};
+}
 
 run();
