@@ -140,23 +140,26 @@ const run = async () => {
 
     const tasks = await getTasks();
 
-    const matchedTasks = tasks
-      .filter(task =>
-        task.connection_type === "dbt" &&
-        (
+    const getMatchedTasks = (tasks, changedModels) => {
+      return tasks
+        .filter(task =>
+          task.connection_type === "dbt" &&
           changedModels.some(cm =>
             cm.model === task.name &&
             cm.job === task.job_name
           )
         )
-      )
-      .map(task => ({
-        name: task.name,
-        asset_id: task.asset_id,
-        connection_id: task.connection_id,
-        connection_name: task.connection_name,
-        entity: task.task_id,
-      }));
+        .map(task => ({
+          name: task.name,
+          asset_id: task.asset_id,
+          connection_id: task.connection_id,
+          connection_name: task.connection_name,
+          entity: task.task_id,
+          task_id: task.task_id,
+          connection_type: task.connection_type,
+          job_name: task.job_name,
+        }));
+    };
 
     const directlyImpactedModels = {};
     for (const task of matchedTasks) {
