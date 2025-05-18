@@ -144,7 +144,7 @@ const run = async () => {
       return tasks
         .filter(task =>
           task.connection_type === "dbt" &&
-          changedModels.some(cm =>
+          changedModels.find(cm =>
             cm.model === task.name &&
             cm.job === task.job_name
           )
