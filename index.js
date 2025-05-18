@@ -160,6 +160,7 @@ const run = async () => {
           job_name: task.job_name,
         }));
     };
+    const matchedTasks = getMatchedTasks(tasks, changedModels);
 
     const directlyImpactedModels = {};
     for (const task of matchedTasks) {
