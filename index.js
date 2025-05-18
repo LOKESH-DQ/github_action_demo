@@ -35,8 +35,10 @@ const getChangedFiles = async () => {
   return Array.from(changedFiles);
 };
 
+const baseurl = "http://44.238.88.190:8000/api/";
+
 const getTasks = async () => {
-  const taskUrl = "http://44.238.88.190:8000/api/pipeline/task/";
+  const taskUrl = `${baseurl}task/`;
   const response = await axios.post(
     taskUrl,
     {},
@@ -50,8 +52,8 @@ const getTasks = async () => {
   return response.data.response.data;
 };
 
-const getLineageData = async (asset_id, connection_id) => {
-  const lineageUrl = "http://44.238.88.190:8000/api/lineage/";
+const getLineageData = async (asset_id, connection_id, entity) => {
+  const lineageUrl = `${baseurl}lineage/`;
   const body = {
     asset_id,
     connection_id,
@@ -155,10 +157,10 @@ const run = async () => {
       }));
 
     const directlyImpactedModels = {};
-    for (const asset of matchedTasks) {
-      const lineageTables = await getLineageData(asset.asset_id, asset.connection_id);
-      const downstream = lineageTables.filter(table => table.flow === "downstream");
-      downstream.forEach(table => {
+    for (const task of matchedTasks) {
+      const lineageTables = await getLineageData(task.asset_id, task.connection_id, task.entity);
+      const lineageData = lineageTables.filter(table => table.flow === "downstream");
+      lineageData.forEach(table => {
         if (!directlyImpactedModels[table.connection_name]) {
           directlyImpactedModels[table.connection_name] = [];
         }
