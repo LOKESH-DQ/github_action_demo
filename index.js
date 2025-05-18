@@ -35,10 +35,10 @@ const getChangedFiles = async () => {
   return Array.from(changedFiles);
 };
 
-const getJobAssets = async () => {
-  const jobUrl = "http://44.238.88.190:8000/api/pipeline/job/";
+const getTasks = async () => {
+  const taskUrl = "http://44.238.88.190:8000/api/pipeline/task/";
   const response = await axios.post(
-    jobUrl,
+    taskUrl,
     {},
     {
       headers: {
@@ -55,7 +55,7 @@ const getLineageData = async (asset_id, connection_id) => {
   const body = {
     asset_id,
     connection_id,
-    entity: asset_id,
+    entity,
   };
 
   const response = await axios.post(
@@ -130,32 +130,41 @@ const run = async () => {
 
     const changedModels = changedFiles
       .filter(file => file.endsWith(".yml") || file.endsWith(".sql"))
-      .map(file => path.basename(file, path.extname(file)))
-      .filter((name, index, self) => name && self.indexOf(name) === index);
+      .map(file => {
+        const parts = file.split(path.sep);
+        const model = path.basename(file, path.extname(file));
+        const job = parts.length >= 2 ? parts[parts.length - 2] : null;
+        return { job, model };
+      })
 
-    const jobAssets = await getJobAssets();
+    const tasks = await getTasks();
 
-    const matchedAssets = jobAssets
-      .filter(asset =>
-        changedModels.includes(asset.name) &&
-        asset.connection_type === "dbt"
+    const matchedTasks = tasks
+      .filter(task =>
+        changedModels.some(
+          cm => cm.model === task.name && cm.job === task.job_name // Match both model and job
+        ) &&
+        task.connection_type === "dbt"
       )
-      .map(asset => ({
-        name: asset.name,
+      .map(task => ({
+        name: task.name,
         asset_id: asset.asset_id,
         connection_id: asset.connection_id,
         connection_name: asset.connection_name,
+        entity: task.task_id,
+
+
       }));
 
-    const downstreamAssetsMap = {};
-    for (const asset of matchedAssets) {
+    const directImpact = {};
+    for (const asset of matchedTasks) {
       const lineageTables = await getLineageData(asset.asset_id, asset.connection_id);
       const downstream = lineageTables.filter(table => table.flow === "downstream");
       downstream.forEach(table => {
-        if (!downstreamAssetsMap[table.connection_name]) {
-          downstreamAssetsMap[table.connection_name] = [];
+        if (!directImpact[table.connection_name]) {
+          directImpact[table.connection_name] = [];
         }
-        downstreamAssetsMap[table.connection_name].push(table.name);
+        directImpact[table.connection_name].push(table.name);
       });
     }
 
@@ -216,11 +225,11 @@ const run = async () => {
       });
     }
 
-    summary += `\n🔗 **Downstream Assets:**\n`;
-    if (Object.keys(downstreamAssetsMap).length === 0) {
+    summary += `\n🔗 **directImpact Assets:**\n`;
+    if (Object.keys(directImpact).length === 0) {
       summary += `- None found\n`;
     } else {
-      for (const [conn, assets] of Object.entries(downstreamAssetsMap)) {
+      for (const [conn, assets] of Object.entries(directImpact)) {
         summary += `- ${conn}:\n`;
         assets.forEach(name => {
           summary += `  - ${name}\n`;
@@ -281,7 +290,7 @@ const run = async () => {
     await core.summary.addRaw(summary).write();
 
     core.setOutput("impact_markdown", summary);
-    core.setOutput("downstream_assets", JSON.stringify(downstreamAssetsMap));
+    core.setOutput("downstream_assets", JSON.stringify(directImpact));
   } catch (error) {
     core.setFailed(`Error: ${error.message}`);
   }
