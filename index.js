@@ -148,7 +148,7 @@ const run = async () => {
         const normTaskName = normalize(task.name);
         const normTaskJob = normalize(task.job_name);
         return (
-          changedModels.some(
+          changedModels.some(cm =>
             (normalize(cm.model) === normTaskName || normTaskName.includes(normalize(cm.model))) &&
             (normalize(cm.job) === normTaskJob || normTaskJob.includes(normalize(cm.job))) // Match both model and job
           ) &&
