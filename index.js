@@ -148,23 +148,21 @@ const run = async () => {
       )
       .map(task => ({
         name: task.name,
-        asset_id: asset.asset_id,
-        connection_id: asset.connection_id,
-        connection_name: asset.connection_name,
+        asset_id: task.asset_id,
+        connection_id: task.connection_id,
+        connection_name: task.connection_name,
         entity: task.task_id,
-
-
       }));
 
-    const directImpact = {};
+    const directlyImpactedModels = {};
     for (const asset of matchedTasks) {
       const lineageTables = await getLineageData(asset.asset_id, asset.connection_id);
       const downstream = lineageTables.filter(table => table.flow === "downstream");
       downstream.forEach(table => {
-        if (!directImpact[table.connection_name]) {
-          directImpact[table.connection_name] = [];
+        if (!directlyImpactedModels[table.connection_name]) {
+          directlyImpactedModels[table.connection_name] = [];
         }
-        directImpact[table.connection_name].push(table.name);
+        directlyImpactedModels[table.connection_name].push(table.name);
       });
     }
 
@@ -220,16 +218,16 @@ const run = async () => {
     if (changedModels.length === 0) {
       summary += `- None\n`;
     } else {
-      changedModels.forEach(model => {
-        summary += `- ${model}\n`;
+      changedModels.forEach(m => {
+        summary += `- ${m.model}\n`;
       });
     }
 
-    summary += `\n🔗 **directImpact Assets:**\n`;
-    if (Object.keys(directImpact).length === 0) {
+    summary += `\n🔗 **Directly Impacted Models:**\n`;
+    if (Object.keys(directlyImpactedModels).length === 0) {
       summary += `- None found\n`;
     } else {
-      for (const [conn, assets] of Object.entries(directImpact)) {
+      for (const [conn, assets] of Object.entries(directlyImpactedModels)) {
         summary += `- ${conn}:\n`;
         assets.forEach(name => {
           summary += `  - ${name}\n`;
@@ -290,7 +288,7 @@ const run = async () => {
     await core.summary.addRaw(summary).write();
 
     core.setOutput("impact_markdown", summary);
-    core.setOutput("downstream_assets", JSON.stringify(directImpact));
+    core.setOutput("downstream_assets", JSON.stringify(directlyImpactedModels));
   } catch (error) {
     core.setFailed(`Error: ${error.message}`);
   }
