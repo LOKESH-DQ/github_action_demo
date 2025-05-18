@@ -183,6 +183,14 @@ const run = async () => {
     let summary = `🧠 **Impact Analysis Summary**\n\n`;
     const sqlColumnChanges = [];
 
+    for (const t of matchedTasks) {
+      summary += `- Task: \`${t.name}\`\n`;
+      summary += `  - Connection: \`${t.connection_name}\`\n`;
+      summary += `  - Asset ID: \`${t.asset_id}\`\n`;
+      summary += `  - Connection ID: \`${t.connection_id}\`\n`;
+      summary += `  - Entity: \`${t.entity}\`\n`;
+    }
+
     for (const file of changedFiles.filter(f => f.endsWith(".sql"))) {
       const baseSha = process.env.GITHUB_BASE_SHA || github.context.payload.pull_request?.base?.sha;
       const baseContent = getFileContent(baseSha, file);
