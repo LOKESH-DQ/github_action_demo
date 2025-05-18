@@ -183,15 +183,10 @@ const run = async () => {
     let summary = `🧠 **Impact Analysis Summary**\n\n`;
     const sqlColumnChanges = [];
 
-    for (const task of tasks) {
-      summary += `\n🔍 **Task:** ${task.name}\n`;
-      summary += `- Connection ID: ${task.connection_id}\n`;
-      summary += `- Asset ID: ${task.asset_id}\n`;
-      summary += `- Connection Name: ${task.connection_name}\n`;
-      summary += `- Job Name: ${task.job_name}\n`;
-      summary += `- Task ID: ${task.task_id}\n`;
-      summary += `- Name: ${task.name}\n`;
-    }
+    for (const file of changedModels) {
+      summary += `\n**Changed DBT Model:-- ${file.model}\n`;
+      summary += `- fghjkjhgfdfghjhgfdjJob:-- ${file.job}\n`;
+
     for (const task of matchedTasks) {
       summary += `\n🔍 **Task:** ${task.name}\n`;
     }
@@ -235,6 +230,7 @@ const run = async () => {
     } else {
       changedModels.forEach(m => {
         summary += `- ${m.model}\n`;
+        summary += `- ${m.job}\n`;
       });
     }
 
