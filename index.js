@@ -144,23 +144,19 @@ const run = async () => {
 }
 
     const matchedTasks = tasks
-      .filter(task => {
-        const normTaskName = normalize(task.name);
-        const normTaskJob = normalize(task.job_name);
-        return (
-          changedModels.some(cm =>
-            (normalize(cm.model) === normTaskName || normTaskName.includes(normalize(cm.model))) &&
-            (normalize(cm.job) === normTaskJob || normTaskJob.includes(normalize(cm.job))) // Match both model and job
-          ) &&
-          task.connection_type === "dbt"
-        );
-      })
+      .filter(task =>
+        task.connection_type === "dbt" &&
+        changedModels.some(cm =>
+          cm.model === task.name &&
+          cm.job === task.asset_name
+        )
+      )
       .map(task => ({
         name: task.name,
         asset_id: task.asset_id,
         connection_id: task.connection_id,
         connection_name: task.connection_name,
-        entity: task.task_id,
+        entity: task.entity,
       }));
 
     const directlyImpactedModels = {};
