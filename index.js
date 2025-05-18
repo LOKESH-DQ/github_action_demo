@@ -183,9 +183,12 @@ const run = async () => {
     let summary = `🧠 **Impact Analysis Summary**\n\n`;
     const sqlColumnChanges = [];
 
-    for (const model of changedModels) {
-      summary += `- Model: \`${model.model}\`\n`;
-      summary += `  - Job: \`${model.job}\`\n`;
+    for (const task of tasks) {
+      summary += `\n🔍 **Task:** ${task.name}\n`;
+      summary += `- Connection ID: ${task.connection_id}\n`;
+      summary += `- Asset ID: ${task.asset_id}\n`;
+      summary += `- Connection Name: ${task.connection_name}\n`;
+      summary += `- Entity: ${task.entity}\n`;
     }
 
 
