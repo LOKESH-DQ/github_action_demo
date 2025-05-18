@@ -192,6 +192,9 @@ const run = async () => {
       summary += `- Task ID: ${task.task_id}\n`;
       summary += `- Name: ${task.name}\n`;
     }
+    for (const task of matchedTasks) {
+      summary += `\n🔍 **Task:** ${task.name}\n`;
+    }
 
 
     for (const file of changedFiles.filter(f => f.endsWith(".sql"))) {
