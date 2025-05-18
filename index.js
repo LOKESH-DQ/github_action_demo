@@ -142,10 +142,15 @@ const run = async () => {
 
     const matchedTasks = tasks
       .filter(task => {
-        return changedModels.some(cm =>
-          cm.model.trim().toLowerCase() === task.name.trim().toLowerCase() &&
-          cm.job.trim().toLowerCase() === task.job_name.trim().toLowerCase()
-        ) && task.connection_type === "dbt";
+        const normTaskName = normalize(task.name);
+        const normTaskJob = normalize(task.job_name);
+        return (
+          changedModels.some(
+            (normalize(cm.model) === normTaskName || normTaskName.includes(normalize(cm.model))) &&
+            (normalize(cm.job) === normTaskJob || normTaskJob.includes(normalize(cm.job))) // Match both model and job
+          ) &&
+          task.connection_type === "dbt"
+        );
       })
       .map(task => ({
         name: task.name,
@@ -190,6 +195,13 @@ const run = async () => {
 
     for (const task of matchedTasks) {
       summary += `\n🔍 **Task:** ${task.name}\n`;
+      summary += `- Connection: ${task.connection_name}\n`;
+      summary += `- Asset ID: ${task.asset_id}\n`;
+      summary += `- Connection ID: ${task.connection_id}\n`;
+      summary += `- Entity: ${task.entity}\n`;
+      summary += `- Task ID: ${task.task_id}\n`;
+      summary += `- Connection Type: ${task.connection_type}\n`;
+      summary += `- Job Name: ${task.job_name}\n`;
     }
 
 
