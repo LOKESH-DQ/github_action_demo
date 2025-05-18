@@ -50,7 +50,7 @@ const getTasks = async () => {
   return response.data.response.data;
 };
 
-const getLineageData = async (asset_id, connection_id) => {
+const getLineageData = async (asset_id, connection_id, entity) => {
   const lineageUrl = "http://44.238.88.190:8000/api/lineage/";
   const body = {
     asset_id,
@@ -155,8 +155,8 @@ const run = async () => {
       }));
 
     const directlyImpactedModels = {};
-    for (const asset of matchedTasks) {
-      const lineageTables = await getLineageData(asset.asset_id, asset.connection_id);
+    for (const task of matchedTasks) {
+      const lineageTables = await getLineageData(task.asset_id, task.connection_id, task.entity);
       const downstream = lineageTables.filter(table => table.flow === "downstream");
       downstream.forEach(table => {
         if (!directlyImpactedModels[table.connection_name]) {
