@@ -139,16 +139,15 @@ const run = async () => {
       })
 
     const tasks = await getTasks();
-    function normalize(str) {
-      return (str || "").trim().toLowerCase();
-}
 
     const matchedTasks = tasks
       .filter(task =>
         task.connection_type === "dbt" &&
-        changedModels.some(cm =>
-          cm.model === task.name &&
-          cm.job === task.asset_name
+        (
+          changedModels.some(cm =>
+            cm.model === task.name &&
+            cm.job === task.job_name
+          )
         )
       )
       .map(task => ({
@@ -156,7 +155,7 @@ const run = async () => {
         asset_id: task.asset_id,
         connection_id: task.connection_id,
         connection_name: task.connection_name,
-        entity: task.entity,
+        entity: task.task_id,
       }));
 
     const directlyImpactedModels = {};
