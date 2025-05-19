@@ -35,9 +35,10 @@ const getChangedFiles = async () => {
   return Array.from(changedFiles);
 };
 
+const baseUrl = "http://44.238.88.190:8000/api/"
 
 const getTasks = async () => {
-  const taskUrl = "http://44.238.88.190:8000/api/pipeline/task/";
+  const taskUrl = `${baseUrl}pipeline/task/`;
   const payload = {
     chartType: 0,
     search: {},
@@ -66,7 +67,7 @@ const getTasks = async () => {
 };
 
 const getLineageData = async (asset_id, connection_id, entity) => {
-  const lineageUrl = "http://44.238.88.190:8000/api/lineage/";
+  const lineageUrl = `${baseUrl}lineage/`;
   const body = {
     asset_id,
     connection_id,
@@ -223,15 +224,31 @@ const run = async () => {
       }
     }
 
-    let summary = `🧠 **Impact Analysis Summary**\n\n`;
+    let summary = `\n **DQLabs Impact Report**\n`;
+    count = Everydata.direct.length + Everydata.indirect.length;
+    summary += `\n **Total Potential impact: ${count} unique downstream items across ${changedModels.length} changed Dbt models\n`;
+    summary += `\n **Directly Impacted Models:**\n ${Everydata.direct.length}\n`;
+
+    if (count <= 20) {
+      for (const task of Everydata.direct) {
+        summary += `     - ${task.name}\n`;
+      }
+    }
+    summary += `\n **Indirectly Impacted Models:**\n ${Everydata.indirect.length}\n`;
+    if (count <= 20) {
+      for (const task of Everydata.indirect) {
+        summary += `     - ${task.name}\n`;
+      }
+    }
+    summary += `\n **Changed Files:**\n`;
     const sqlColumnChanges = [];
-    summary += `- $Evertdata Direct:\n`;
+    summary += `\n🔗 **Directly Impacted Models:**\n`;
 
     for (const task of Everydata.direct) {
       summary += `  - ${task.name}\n`;
     }
 
-    summary += `- $Evertdata Indirect:\n`;
+    summary += `\n🔗 **Indirectly Impacted Models:**\n`;
     for (const task of Everydata.indirect) {
       summary += `  - ${task.name}\n`;
     }
@@ -242,17 +259,24 @@ const run = async () => {
       const headSha = process.env.GITHUB_HEAD_SHA || github.context.payload.pull_request?.head?.sha;
       const headContent = getFileContent(headSha, file);
 
-      summary += `file is ${file}\n`;
-
       if (!headContent) continue;
 
       const baseCols = baseContent ? extractColumnsFromSQL(baseContent) : [];
       const headCols = extractColumnsFromSQL(headContent);
-
       const added = headCols.filter(col => !baseCols.includes(col));
-      summary += `added columns : ${added.length}\n`;
       const removed = baseCols.filter(col => !headCols.includes(col));
-      summary += `removed columns : ${removed.length}\n`;
+
+      if (count > 20) {
+        summary += `\n🧾 **Changed Columns across all models**\n`;
+        summary += `         - added columns : ${added.length}\n`;
+        summary += `         - removed columns : ${removed.length}\n`;
+
+      }
+
+      summary += `\n🧾 **SQL Column Changes:**\n`;
+
+      summary += `columns added   : ${added.length}\n`;
+      summary += `columns removed : ${removed.length}\n`;
 
       if (added.length > 0 || removed.length > 0) {
         sqlColumnChanges.push({ file, added, removed });
@@ -265,20 +289,7 @@ const run = async () => {
     } else {
       changedModels.forEach(m => {
         summary += `- ${m.model}\n`;
-        summary += `- ${m.job}\n`;
       });
-    }
-
-    summary += `\n🔗 **Directly Impacted Models:**\n`;
-    if (Object.keys(directlyImpactedModels).length === 0) {
-      summary += `- None found\n`;
-    } else {
-      for (const [conn, assets] of Object.entries(directlyImpactedModels)) {
-        summary += `- ${conn}:\n`;
-        assets.forEach(name => {
-          summary += `  - ${name}\n`;
-        });
-      }
     }
 
     if (columnChanges.length > 0) {
@@ -299,19 +310,6 @@ const run = async () => {
             summary += `      - old: ${JSON.stringify(mod.old)}\n`;
             summary += `      - new: ${JSON.stringify(mod.new)}\n`;
           });
-        }
-      }
-    }
-
-    if (sqlColumnChanges.length > 0) {
-      summary += `\n🧾 **SQL Column Changes:**\n`;
-      for (const change of sqlColumnChanges) {
-        summary += `\n- \`${change.file}\`\n`;
-        if (change.added.length > 0) {
-          summary += `  - ➕ Added: ${change.added.join(", ")}\n`;
-        }
-        if (change.removed.length > 0) {
-          summary += `  - ➖ Removed: ${change.removed.join(", ")}\n`;
         }
       }
     }
