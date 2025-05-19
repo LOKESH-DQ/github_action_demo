@@ -186,9 +186,8 @@ const run = async () => {
         }
         directlyImpactedModels[table.connection_name].push(table.name);
       });
+      Everydata.direct.push(...lineageData);
     }
-    
-    Everydata.direct.push(...lineageData);
 
     const indirectlyImpactedModels = async (list) => {
       for (const item of list) {
