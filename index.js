@@ -5,11 +5,12 @@ const fs = require("fs");
 const path = require("path");
 const yaml = require("js-yaml");
 
+// 👇 Import the SQL parser utilities
 const { extractColumnsFromSQL, getFileContent } = require("./sql-parser");
 
 const clientId = core.getInput("api_client_id");
 const clientSecret = core.getInput("api_client_secret");
-const changedFilesList = core.getInput("changed_files_list");
+const changedFilesList = core.getInput("changed_files_list"); // comma separated list
 const githubToken = core.getInput("GITHUB_TOKEN");
 
 const getChangedFiles = async () => {
@@ -25,14 +26,15 @@ const getChangedFiles = async () => {
   const changedFiles = new Set();
 
   const commits = eventData.commits || [];
-  commits.forEach(commit => {
-    [...commit.added, ...commit.modified, ...commit.removed].forEach(file => {
+  commits.forEach((commit) => {
+    [...commit.added, ...commit.modified, ...commit.removed].forEach((file) => {
       changedFiles.add(file);
     });
   });
 
   return Array.from(changedFiles);
 };
+
 
 const getTasks = async () => {
   const taskUrl = "http://44.238.88.190:8000/api/pipeline/task/";
@@ -43,49 +45,46 @@ const getTasks = async () => {
     pageLimit: 100,
     sortBy: "name",
     orderBy: "asc",
-    date_filter: { days: "All", selected: "All" },
+    date_filter: {
+      days: "All",
+      selected: "All"
+    },
     chart_filter: {},
     is_chart: true
   };
-
-  const response = await axios.post(taskUrl, payload, {
-    headers: {
-      "client-id": clientId,
-      "client-secret": clientSecret,
-    },
-  });
-
+  const response = await axios.post(
+    taskUrl,
+    payload,
+    {
+      headers: {
+        "client-id": clientId,
+        "client-secret": clientSecret,
+      },
+    }
+  );
   return response.data.response.data;
 };
 
-// ✅ NEW: fetch downstream models using GET
-const fetchDownstreams = async (asset_id, connection_id, entity) => {
-  const url = `http://44.238.88.190:8000/api/lineage/?asset_id=${asset_id}&connection_id=${connection_id}&entity=${entity}`;
-  const response = await axios.get(url, {
-    headers: {
-      "client-id": clientId,
-      "client-secret": clientSecret,
+const getLineageData = async (asset_id, connection_id, entity) => {
+  const lineageUrl = "http://44.238.88.190:8000/api/lineage/";
+  const body = {
+    asset_id,
+    connection_id,
+    entity,
+  };
+
+  const response = await axios.post(
+    lineageUrl,
+    body,
+    {
+      headers: {
+        "client-id": clientId,
+        "client-secret": clientSecret,
+      },
     }
-  });
+  );
 
-  return response.data.downstream_models || [];
-};
-
-const buildModelKey = (model) => `${model.asset_id}_${model.connection_id}_${model.entity}`;
-
-// ✅ NEW: recursively collect downstreams
-const exploreDownstreams = async (asset_id, connection_id, entity, modelMap = {}) => {
-  const downstreams = await fetchDownstreams(asset_id, connection_id, entity);
-
-  for (const model of downstreams) {
-    const key = buildModelKey(model);
-    if (!modelMap[key]) {
-      modelMap[key] = model;
-      await exploreDownstreams(model.asset_id, model.connection_id, model.entity, modelMap);
-    }
-  }
-
-  return modelMap;
+  return response.data.response.data.tables;
 };
 
 const extractColumnsFromYaml = (filePath) => {
@@ -151,7 +150,7 @@ const run = async () => {
         const model = path.basename(file, path.extname(file));
         const job = parts.length >= 2 ? parts[parts.length - 2] : null;
         return { job, model };
-      });
+      })
 
     const tasks = await getTasks();
 
@@ -159,7 +158,8 @@ const run = async () => {
       .filter(task =>
         task.connection_type === "dbt" &&
         changedModels.some(cm =>
-          cm.model === task.name && cm.job === task.job_name
+          cm.model === task.name &&
+          cm.job === task.job_name
         )
       )
       .map(task => ({
@@ -170,19 +170,19 @@ const run = async () => {
         entity: task.task_id,
       }));
 
-    const allImpactedModels = {};
-
+    const directlyImpactedModels = {};
     for (const task of matchedTasks) {
-      const modelMap = await exploreDownstreams(task.asset_id, task.connection_id, task.entity);
-      const conn = task.connection_name;
-      if (!allImpactedModels[conn]) allImpactedModels[conn] = [];
-      Object.values(modelMap).forEach(model => {
-        if (!allImpactedModels[conn].includes(model.name)) {
-          allImpactedModels[conn].push(model.name);
+      const lineageTables = await getLineageData(task.asset_id, task.connection_id, task.entity);
+      const lineageData = lineageTables.filter(table => table.flow === "downstream");
+      lineageData.forEach(table => {
+        if (!directlyImpactedModels[table.connection_name]) {
+          directlyImpactedModels[table.connection_name] = [];
         }
+        directlyImpactedModels[table.connection_name].push(table.name);
       });
     }
 
+    // YAML file column comparison
     const columnChanges = [];
     for (const file of changedFiles.filter(f => f.endsWith(".yml"))) {
       const basePath = path.join("base", file);
@@ -196,37 +196,55 @@ const run = async () => {
     }
 
     let summary = `🧠 **Impact Analysis Summary**\n\n`;
-
-    for (const file of changedModels) {
-      summary += `\n**Changed DBT Model:** \`${file.model}\`\n`;
-      summary += `- Job: \`${file.job}\`\n`;
-    }
-
     const sqlColumnChanges = [];
+    
     for (const file of changedFiles.filter(f => f.endsWith(".sql"))) {
       const baseSha = process.env.GITHUB_BASE_SHA || github.context.payload.pull_request?.base?.sha;
       const baseContent = getFileContent(baseSha, file);
       const headSha = process.env.GITHUB_HEAD_SHA || github.context.payload.pull_request?.head?.sha;
       const headContent = getFileContent(headSha, file);
 
+      summary += `headsha---- is ${headSha}\n`;
+      summary += `basesha---- is ${baseSha}\n`;
+      summary += `file is ${file}\n`;
+
       if (!headContent) continue;
+      if (baseContent) {
+        summary += `baseContent is these \n`;
+      }else {
+        summary += `baseContent is not these \n`;
+      }
 
       const baseCols = baseContent ? extractColumnsFromSQL(baseContent) : [];
+      summary += `base columns : ${baseCols.join(", ")}\n`;
       const headCols = extractColumnsFromSQL(headContent);
+      summary += `head columns : ${headCols.join(", ")}\n`;
 
       const added = headCols.filter(col => !baseCols.includes(col));
+      summary += `added columns : ${added.join(", ")}\n`;
       const removed = baseCols.filter(col => !headCols.includes(col));
+      summary += `removed columns : ${removed.join(", ")}\n`;
 
       if (added.length > 0 || removed.length > 0) {
         sqlColumnChanges.push({ file, added, removed });
       }
     }
 
-    summary += `\n🔗 **Impacted Downstream Models (Recursive):**\n`;
-    if (Object.keys(allImpactedModels).length === 0) {
+    summary += `\n📄 **Changed DBT Models:**\n`;
+    if (changedModels.length === 0) {
+      summary += `- None\n`;
+    } else {
+      changedModels.forEach(m => {
+        summary += `- ${m.model}\n`;
+        summary += `- ${m.job}\n`;
+      });
+    }
+
+    summary += `\n🔗 **Directly Impacted Models:**\n`;
+    if (Object.keys(directlyImpactedModels).length === 0) {
       summary += `- None found\n`;
     } else {
-      for (const [conn, assets] of Object.entries(allImpactedModels)) {
+      for (const [conn, assets] of Object.entries(directlyImpactedModels)) {
         summary += `- ${conn}:\n`;
         assets.forEach(name => {
           summary += `  - ${name}\n`;
@@ -236,6 +254,7 @@ const run = async () => {
 
     if (columnChanges.length > 0) {
       summary += `\n🧬 **YAML Column-Level Changes:**\n`;
+      summary += `changed columns are b: ${columnChanges}\n`;
       for (const change of columnChanges) {
         summary += `\n- \`${change.file}\`\n`;
         if (change.added.length > 0) {
@@ -286,10 +305,10 @@ const run = async () => {
     await core.summary.addRaw(summary).write();
 
     core.setOutput("impact_markdown", summary);
-    core.setOutput("downstream_assets", JSON.stringify(allImpactedModels));
+    core.setOutput("downstream_assets", JSON.stringify(directlyImpactedModels));
   } catch (error) {
     core.setFailed(`Error: ${error.message}`);
   }
-};
+}
 
 run();
