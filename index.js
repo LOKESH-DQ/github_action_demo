@@ -180,6 +180,7 @@ const run = async () => {
       const lineageTables = await getLineageData(task.asset_id, task.connection_id, task.entity);
       const lineageData = lineageTables.filter(table => table.flow === "downstream" && table.name !== task.name);
       lineageData.forEach(table => {
+        table.modelEntity = task.entity;
         if (!directlyImpactedModels[table.connection_name]) {
           directlyImpactedModels[table.connection_name] = [];
         }
@@ -193,13 +194,19 @@ const run = async () => {
       for (const item of list) {
         const lineageTables = await getLineageData(item.asset_id, item.connection_id, item.entity);
         if (lineageTables.length === 0) {
-          Everydata.indirect.push(...item);
+          Everydata.indirect.push(item);
           continue;
-        } else {
-          indirectlyImpactedModels(item);
-        }       // You can process lineageData here as needed
-      }
-    }; // Uncomment and implement if needed
+        }
+        const filtered = lineageTables.filter(table => table.flow === "downstream" && table.name !== item.name);
+        filtered.forEach(table => {
+          table.modelEntity = item.modelEntity;  // fallback if no modelEntity set
+        });
+        Everydata.indirect.push(item);
+        await indirectlyImpactedModels(lineageTables);
+      } // You can process lineageData here as needed
+    }
+
+    await indirectlyImpactedModels(Everydata.direct);
 
     summary += `- $Evertdata Direct:\n`;
 
