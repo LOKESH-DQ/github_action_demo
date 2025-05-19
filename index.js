@@ -132,35 +132,45 @@ const run = async () => {
     const changedModels = changedFiles
       .filter(file => file.endsWith(".yml") || file.endsWith(".sql"))
       .map(file => {
-        const parts = file.split(path.sep);
         const model = path.basename(file, path.extname(file));
-        const job = parts.length >= 2 ? parts[parts.length - 2] : null;
+        const dir = path.dirname(file);
+        const folders = dir.split(path.sep);
+        const job = folders[folders.length - 1] || "unknown";
         return { job, model };
       })
+      .filter(
+        (value, index, self) =>
+          self.findIndex(
+            v => v.model === value.model && v.job === value.job
+          ) === index
+      );
 
     const tasks = await getTasks();
-
-    const getMatchedTasks = (tasks, changedModels) => {
-      return tasks
-        .filter(task =>
-          task.connection_type === "dbt" &&
-          changedModels.filter(cm =>
-            cm.model === task.name &&
-            cm.job === task.job_name
-          )
-        )
-        .map(task => ({
-          name: task.name,
-          asset_id: task.asset_id,
-          connection_id: task.connection_id,
-          connection_name: task.connection_name,
-          entity: task.task_id,
-          task_id: task.task_id,
-          connection_type: task.connection_type,
-          job_name: task.job_name,
-        }));
+    
+    const getJobFromPath = (filePath) => {
+      const folders = path.dirname(filePath).split(path.sep);
+      return folders[folders.length - 1] || "unknown";
     };
-    const matchedTasks = getMatchedTasks(tasks, changedModels);
+
+
+    const matchedTasks = tasks
+      .filter(task =>
+        changedModels.some(model => {
+          const modelJob = getJobFromPath(task.path);
+          return (
+            model.model === task.name &&
+            model.job === task.job_name &&
+            task.connection_type === "dbt"
+          );
+        })
+      )
+      .map(task => ({
+        name: task.name,
+        asset_id: task.asset_id,
+        connection_id: task.connection_id,
+        connection_name: task.connection_name,
+        entity: task.task_id,
+      }));
 
     const directlyImpactedModels = {};
     for (const task of matchedTasks) {
