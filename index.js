@@ -210,17 +210,6 @@ const run = async () => {
 
     await indirectlyImpactedModels(Everydata.direct, "job","");
 
-    summary += `- $Evertdata Direct:\n`;
-
-    for (const task of Everydata.direct) {
-      summary += `  - ${task.name}\n`;
-    }
-
-    summary += `- $Evertdata Indirect:\n`;
-    for (const task of Everydata.indirect) {
-      summary += `  - ${task.name}\n`;
-    }
-
     // YAML file column comparison
     const columnChanges = [];
     for (const file of changedFiles.filter(f => f.endsWith(".yml"))) {
@@ -236,6 +225,16 @@ const run = async () => {
 
     let summary = `🧠 **Impact Analysis Summary**\n\n`;
     const sqlColumnChanges = [];
+    summary += `- $Evertdata Direct:\n`;
+
+    for (const task of Everydata.direct) {
+      summary += `  - ${task.name}\n`;
+    }
+
+    summary += `- $Evertdata Indirect:\n`;
+    for (const task of Everydata.indirect) {
+      summary += `  - ${task.name}\n`;
+    }
     
     for (const file of changedFiles.filter(f => f.endsWith(".sql"))) {
       const baseSha = process.env.GITHUB_BASE_SHA || github.context.payload.pull_request?.base?.sha;
@@ -243,26 +242,17 @@ const run = async () => {
       const headSha = process.env.GITHUB_HEAD_SHA || github.context.payload.pull_request?.head?.sha;
       const headContent = getFileContent(headSha, file);
 
-      summary += `headsha---- is ${headSha}\n`;
-      summary += `basesha---- is ${baseSha}\n`;
       summary += `file is ${file}\n`;
 
       if (!headContent) continue;
-      if (baseContent) {
-        summary += `baseContent is these \n`;
-      }else {
-        summary += `baseContent is not these \n`;
-      }
 
       const baseCols = baseContent ? extractColumnsFromSQL(baseContent) : [];
-      summary += `base columns : ${baseCols.join(", ")}\n`;
       const headCols = extractColumnsFromSQL(headContent);
-      summary += `head columns : ${headCols.join(", ")}\n`;
 
       const added = headCols.filter(col => !baseCols.includes(col));
-      summary += `added columns : ${added.join(", ")}\n`;
+      summary += `added columns : ${added.length}\n`;
       const removed = baseCols.filter(col => !headCols.includes(col));
-      summary += `removed columns : ${removed.join(", ")}\n`;
+      summary += `removed columns : ${removed.length}\n`;
 
       if (added.length > 0 || removed.length > 0) {
         sqlColumnChanges.push({ file, added, removed });
@@ -325,8 +315,6 @@ const run = async () => {
         }
       }
     }
-
-    console.log(summary);
 
     const octokit = github.getOctokit(githubToken);
 
