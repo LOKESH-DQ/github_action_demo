@@ -191,7 +191,7 @@ const run = async () => {
 
     const indirectlyImpactedModels = async (list) => {
       for (const item of list) {
-        const lineageTables = await getLineageData(item.asset_id, item.connection_id, item.entity);
+        const lineageTables = await getLineageData(item.asset_id, item.connection_id, item.modelEntity);
         if (lineageTables.length === 0) {
           Everydata.indirect.push(item);
           continue;
