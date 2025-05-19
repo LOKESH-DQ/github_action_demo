@@ -226,9 +226,8 @@ const run = async () => {
 
     let summary = `\n **DQLabs Impact Report**\n`;
     count = Everydata.direct.length + Everydata.indirect.length;
-    summary += `\n **Total Potential impact: ${count} unique downstream items across ${changedModels.length} changed Dbt models\n`;
+    summary += `\n **Total Potential impact: ${count} unique downstream items across ${changedModels.length} changed Dbt models:** ${count}\n`;
     summary += `\n **Directly Impacted Models:**\n ${Everydata.direct.length}\n`;
-
     if (count <= 20) {
       for (const task of Everydata.direct) {
         summary += `     - ${task.name}\n`;
@@ -266,17 +265,10 @@ const run = async () => {
       const added = headCols.filter(col => !baseCols.includes(col));
       const removed = baseCols.filter(col => !headCols.includes(col));
 
-      if (count > 20) {
-        summary += `\n🧾 **Changed Columns across all models**\n`;
-        summary += `         - added columns : ${added.length}\n`;
-        summary += `         - removed columns : ${removed.length}\n`;
-
-      }
-
       summary += `\n🧾 **SQL Column Changes:**\n`;
 
-      summary += `columns added   : ${added.length}\n`;
-      summary += `columns removed : ${removed.length}\n`;
+      summary += `added columns : ${added.length}\n`;
+      summary += `removed columns : ${removed.length}\n`;
 
       if (added.length > 0 || removed.length > 0) {
         sqlColumnChanges.push({ file, added, removed });
