@@ -132,37 +132,21 @@ const run = async () => {
     const changedModels = changedFiles
       .filter(file => file.endsWith(".yml") || file.endsWith(".sql"))
       .map(file => {
+        const parts = file.split(path.sep);
         const model = path.basename(file, path.extname(file));
-        const dir = path.dirname(file);
-        const folders = dir.split(path.sep);
-        const job = folders[folders.length - 1] || "unknown";
+        const job = parts.length >= 2 ? parts[parts.length - 2] : null;
         return { job, model };
       })
-      .filter(
-        (value, index, self) =>
-          self.findIndex(
-            v => v.model === value.model && v.job === value.job
-          ) === index
-      );
 
     const tasks = await getTasks();
-    
-    const getJobFromPath = (filePath) => {
-      const folders = path.dirname(filePath).split(path.sep);
-      return folders[folders.length - 1] || "unknown";
-    };
-
 
     const matchedTasks = tasks
       .filter(task =>
-        changedModels.some(model => {
-          const modelJob = getJobFromPath(task.path);
-          return (
-            model.model === task.name &&
-            model.job === task.job_name &&
-            task.connection_type === "dbt"
-          );
-        })
+        task.connection_type === "dbt" &&
+        changedModels.some(cm =>
+          cm.model === task.name &&
+          cm.job === task.job_name
+        )
       )
       .map(task => ({
         name: task.name,
@@ -257,6 +241,14 @@ const run = async () => {
         summary += `- ${m.model}\n`;
         summary += `- ${m.job}\n`;
       });
+    }
+
+    for (const file of tasks) {
+      summary += `\n🔍 **Task:** ${file.name}\n`;
+      summary += `- Connection: ${file.connection_name}\n`;
+      summary += `- Asset ID: ${file.asset_id}\n`;
+      summary += `- Connection ID: ${file.connection_id}\n`;
+      summary += `- Entity: ${file.task_id}\n`;
     }
 
     summary += `\n🔗 **Directly Impacted Models:**\n`;
