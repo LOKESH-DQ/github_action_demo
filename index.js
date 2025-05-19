@@ -189,23 +189,26 @@ const run = async () => {
       Everydata.direct.push(...lineageData);
     }
 
-    const indirectlyImpactedModels = async (list) => {
+    const indirectlyImpactedModels = async (list, x, entity) => {
       for (const item of list) {
-        const lineageTables = await getLineageData(item.asset_id, item.connection_id, item.modelEntity);
+        if (x === "task" && entity) {
+          var entity_final = entity;
+        } else if (x === "job") {
+          var entity_final = item.modelEntity;
+        }
+        const lineageTables = await getLineageData(item.asset_id, item.connection_id, entity_final);
         if (lineageTables.length === 0) {
           Everydata.indirect.push(item);
           continue;
         }
         const filtered = lineageTables.filter(table => table.flow === "downstream" && table.name !== item.name);
-        filtered.forEach(table => {
-          table.modelEntity = item.modelEntity;  // fallback if no modelEntity set
-        });
+        
         Everydata.indirect.push(item);
-        await indirectlyImpactedModels(lineageTables);
+        await indirectlyImpactedModels(filtered, "task", entity_final);
       } // You can process lineageData here as needed
     }
 
-    await indirectlyImpactedModels(Everydata.direct);
+    await indirectlyImpactedModels(Everydata.direct, "job","");
 
     summary += `- $Evertdata Direct:\n`;
 
