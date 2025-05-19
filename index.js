@@ -170,16 +170,46 @@ const run = async () => {
         entity: task.task_id,
       }));
 
+    const Everydata = {
+      direct: [],
+      indirect: []
+    };
+
     const directlyImpactedModels = {};
     for (const task of matchedTasks) {
       const lineageTables = await getLineageData(task.asset_id, task.connection_id, task.entity);
-      const lineageData = lineageTables.filter(table => table.flow === "downstream");
+      const lineageData = lineageTables.filter(table => table.flow === "downstream" && table.name !== task.name);
       lineageData.forEach(table => {
         if (!directlyImpactedModels[table.connection_name]) {
           directlyImpactedModels[table.connection_name] = [];
         }
         directlyImpactedModels[table.connection_name].push(table.name);
       });
+    }
+    
+    Everydata.direct.push(...lineageData);
+
+    const indirectlyImpactedModels = async (list) => {
+      for (const item of list) {
+        const lineageTables = await getLineageData(item.asset_id, item.connection_id, item.entity);
+        if (lineageTables.length === 0) {
+          Everydata.indirect.push(...item);
+          continue;
+        } else {
+          indirectlyImpactedModels(item);
+        }       // You can process lineageData here as needed
+      }
+    }; // Uncomment and implement if needed
+
+    summary += `- $Evertdata Direct:\n`;
+
+    for (const task of Everydata.direct) {
+      summary += `  - ${task.name}\n`;
+    }
+
+    summary += `- $Evertdata Indirect:\n`;
+    for (const task of Everydata.indirect) {
+      summary += `  - ${task.name}\n`;
     }
 
     // YAML file column comparison
