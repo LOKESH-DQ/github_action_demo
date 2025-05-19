@@ -38,9 +38,23 @@ const getChangedFiles = async () => {
 
 const getTasks = async () => {
   const taskUrl = "http://44.238.88.190:8000/api/pipeline/task/";
+  const payload = {
+    chartType: 0,
+    search: {},
+    page: 0,
+    pageLimit: 100,
+    sortBy: "name",
+    orderBy: "asc",
+    date_filter: {
+      days: "All",
+      selected: "All"
+    },
+    chart_filter: {},
+    is_chart: true
+  };
   const response = await axios.post(
     taskUrl,
-    {},
+    payload,
     {
       headers: {
         "client-id": clientId,
