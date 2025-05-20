@@ -12,6 +12,7 @@ const clientId = core.getInput("api_client_id");
 const clientSecret = core.getInput("api_client_secret");
 const changedFilesList = core.getInput("changed_files_list"); // comma-separated list
 const githubToken = core.getInput("GITHUB_TOKEN");
+const dqlabs_base_url = core.getInput("dqlabs_base_url");
 
 const getChangedFiles = async () => {
   if (changedFilesList) {
@@ -35,8 +36,9 @@ const getChangedFiles = async () => {
   return Array.from(changedFiles);
 };
 
+
 const getTasks = async () => {
-  const taskUrl = "http://44.238.88.190:8000/api/pipeline/task/";
+  const taskUrl = `${dqlabs_base_url}api/pipeline/task/`;
   const payload = {
     chartType: 0,
     search: {},
@@ -63,7 +65,7 @@ const getTasks = async () => {
 };
 
 const getLineageData = async (asset_id, connection_id, entity) => {
-  const lineageUrl = "http://44.238.88.190:8000/api/lineage/";
+  const lineageUrl = `${dqlabs_base_url}api/lineage/`;
   const body = { asset_id, connection_id, entity };
 
   const response = await axios.post(lineageUrl, body, {
@@ -74,57 +76,6 @@ const getLineageData = async (asset_id, connection_id, entity) => {
   });
 
   return response.data.response.data.tables;
-};
-
-const extractColumnsFromYaml = filePath => {
-  try {
-    const content = fs.readFileSync(filePath, "utf8");
-    const doc = yaml.load(content);
-    const models = doc.models || [];
-    const columns = {};
-
-    models.forEach(model => {
-      (model.columns || []).forEach(col => {
-        if (col.name) {
-          columns[col.name] = col;
-        }
-      });
-    });
-
-    return columns;
-  } catch (err) {
-    console.warn(`Failed to read or parse ${filePath}:`, err.message);
-    return {};
-  }
-};
-
-const compareColumns = (oldCols, newCols) => {
-  const added = [];
-  const removed = [];
-  const modified = [];
-
-  const oldKeys = Object.keys(oldCols);
-  const newKeys = Object.keys(newCols);
-
-  for (const key of newKeys) {
-    if (!oldCols[key]) {
-      added.push(key);
-    } else if (JSON.stringify(oldCols[key]) !== JSON.stringify(newCols[key])) {
-      modified.push({
-        name: key,
-        old: oldCols[key],
-        new: newCols[key],
-      });
-    }
-  }
-
-  for (const key of oldKeys) {
-    if (!newCols[key]) {
-      removed.push(key);
-    }
-  }
-
-  return { added, removed, modified };
 };
 
 const run = async () => {
@@ -198,17 +149,23 @@ const run = async () => {
 
     await indirectlyImpactedModels(Everydata.direct, "job", "");
 
+    const uniqueModels = new Set();
+
+    [...Everydata.direct, ...Everydata.indirect].forEach(item => {
+      if (item.name) uniqueModels.add(item.name);
+    });
+
     let summary = `\n **DQLabs Impact Report**\n`;
-    count = Everydata.direct.length + Everydata.indirect.length;
+    count = uniqueModels.size;
     summary += `\n **Total Potential impact: ${count} unique downstream items across ${changedModels.length} changed Dbt models\n`;
-    summary += `\n **Directly Impacted Models:**\n ${Everydata.direct.length}\n`;
+    summary += `\n **Directly Impacted Models:** ${Everydata.direct.length}\n`;
 
     if (count <= 20) {
       for (const task of Everydata.direct) {
         summary += `     - ${task.name}\n`;
       }
     }
-    summary += `\n **Indirectly Impacted Models:**\n ${Everydata.indirect.length}\n`;
+    summary += `\n **Indirectly Impacted Models:** ${Everydata.indirect.length}\n`;
     if (count <= 20) {
       for (const task of Everydata.indirect) {
         summary += `     - ${task.name}\n`;
@@ -241,7 +198,7 @@ const run = async () => {
       }
     }
 
-    summary += `\n **SQL Column Changes:**\n`;
+    summary += `\n **Column Changes:**\n`;
     summary += `added checkcolumns(${allAddedColumns.length}): ${allAddedColumns.join(", ")}\n`;
     summary += `removed checkcolumns(${allRemovedColumns.length}): ${allRemovedColumns.join(", ")}\n`;
 
