@@ -217,6 +217,8 @@ const run = async () => {
 
 
     const sqlColumnChanges = [];
+    let allAddedColumns = [];
+    let allRemovedColumns = [];
 
     for (const file of changedFiles.filter(f => f.endsWith(".sql"))) {
       const baseSha = process.env.GITHUB_BASE_SHA || github.context.payload.pull_request?.base?.sha;
