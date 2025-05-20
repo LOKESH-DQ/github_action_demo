@@ -13,7 +13,6 @@ const clientSecret = core.getInput("api_client_secret");
 const changedFilesList = core.getInput("changed_files_list"); // comma-separated list
 const githubToken = core.getInput("GITHUB_TOKEN");
 const dqlabs_base_url = core.getInput("dqlabs_base_url");
-print("dqlabs_base_url-----", dqlabs_base_url);
 
 const getChangedFiles = async () => {
   if (changedFilesList) {
@@ -67,6 +66,7 @@ const getTasks = async () => {
 
 const getLineageData = async (asset_id, connection_id, entity) => {
   const lineageUrl = `${dqlabs_base_url}/api/lineage/`;
+  core.info("lineage url:", lineageUrl);
   const body = { asset_id, connection_id, entity };
 
   const response = await axios.post(lineageUrl, body, {
