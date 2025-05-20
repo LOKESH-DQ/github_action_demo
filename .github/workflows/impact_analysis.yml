@@ -96,7 +96,7 @@ jobs:
           include_renamed: true
           separator: ","
 
-      # Run your custom impact analysis action
+      # Run your custom impact analysis action more actions
       - name: Run DQLabs Impact Analysis
         id: impact-analysis
         uses: LOKESH-DQ/github_action_demo@main
@@ -105,6 +105,8 @@ jobs:
           api_client_secret: ${{ secrets.DQLABS_API_CLIENT_SECRET }}
           changed_files_list: ${{ steps.changes.outputs.all_changed_files }},${{ steps.changes.outputs.deleted_files }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          dqlabs_base_url: ${{ secrets.DQLABS_BASE_URL }}
+
 
       # Show summary logs for debugging
       - name: Show Summary in Logs
