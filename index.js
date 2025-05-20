@@ -5,11 +5,12 @@ const fs = require("fs");
 const path = require("path");
 const yaml = require("js-yaml");
 
+// 👇 Import the SQL parser utilities
 const { extractColumnsFromSQL, getFileContent } = require("./sql-parser");
 
 const clientId = core.getInput("api_client_id");
 const clientSecret = core.getInput("api_client_secret");
-const changedFilesList = core.getInput("changed_files_list"); // comma separated list
+const changedFilesList = core.getInput("changed_files_list"); // comma-separated list
 const githubToken = core.getInput("GITHUB_TOKEN");
 
 const getChangedFiles = async () => {
@@ -25,8 +26,8 @@ const getChangedFiles = async () => {
   const changedFiles = new Set();
 
   const commits = eventData.commits || [];
-  commits.forEach((commit) => {
-    [...commit.added, ...commit.modified, ...commit.removed].forEach((file) => {
+  commits.forEach(commit => {
+    [...commit.added, ...commit.modified, ...commit.removed].forEach(file => {
       changedFiles.add(file);
     });
   });
@@ -34,10 +35,8 @@ const getChangedFiles = async () => {
   return Array.from(changedFiles);
 };
 
-const baseUrl = "http://44.238.88.190:8000/api/";
-
 const getTasks = async () => {
-  const taskUrl = `${baseUrl}pipeline/task/`;
+  const taskUrl = "http://44.238.88.190:8000/api/pipeline/task/";
   const payload = {
     chartType: 0,
     search: {},
@@ -52,17 +51,19 @@ const getTasks = async () => {
     chart_filter: {},
     is_chart: true,
   };
+
   const response = await axios.post(taskUrl, payload, {
     headers: {
       "client-id": clientId,
       "client-secret": clientSecret,
     },
   });
+
   return response.data.response.data;
 };
 
 const getLineageData = async (asset_id, connection_id, entity) => {
-  const lineageUrl = `${baseUrl}lineage/`;
+  const lineageUrl = "http://44.238.88.190:8000/api/lineage/";
   const body = { asset_id, connection_id, entity };
 
   const response = await axios.post(lineageUrl, body, {
@@ -75,7 +76,7 @@ const getLineageData = async (asset_id, connection_id, entity) => {
   return response.data.response.data.tables;
 };
 
-const extractColumnsFromYaml = (filePath) => {
+const extractColumnsFromYaml = filePath => {
   try {
     const content = fs.readFileSync(filePath, "utf8");
     const doc = yaml.load(content);
@@ -159,13 +160,15 @@ const run = async () => {
 
     const Everydata = {
       direct: [],
-      indirect: []
+      indirect: [],
     };
 
     const directlyImpactedModels = {};
+
     for (const task of matchedTasks) {
       const lineageTables = await getLineageData(task.asset_id, task.connection_id, task.entity);
       const lineageData = lineageTables.filter(table => table.flow === "downstream" && table.name !== task.name);
+
       lineageData.forEach(table => {
         table.modelEntity = task.entity;
         if (!directlyImpactedModels[table.connection_name]) {
@@ -173,14 +176,15 @@ const run = async () => {
         }
         directlyImpactedModels[table.connection_name].push(table.name);
       });
+
       Everydata.direct.push(...lineageData);
     }
 
     const indirectlyImpactedModels = async (list, x, entity) => {
       for (const item of list) {
         const entity_final = x === "task" && entity ? entity : item.modelEntity;
-
         const lineageTables = await getLineageData(item.asset_id, item.connection_id, entity_final);
+
         if (lineageTables.length === 0) {
           Everydata.indirect.push(item);
           continue;
@@ -194,34 +198,26 @@ const run = async () => {
 
     await indirectlyImpactedModels(Everydata.direct, "job", "");
 
-    // YAML column-level changes
-    const columnChanges = [];
-    for (const file of changedFiles.filter(f => f.endsWith(".yml"))) {
-      const basePath = path.join("base", file);
-      const headPath = file;
-      const baseColumns = fs.existsSync(basePath) ? extractColumnsFromYaml(basePath) : {};
-      const headColumns = fs.existsSync(headPath) ? extractColumnsFromYaml(headPath) : {};
-      const { added, removed, modified } = compareColumns(baseColumns, headColumns);
-      if (added.length > 0 || removed.length > 0 || modified.length > 0) {
-        columnChanges.push({ file, added, removed, modified });
+    let summary = `\n **DQLabs Impact Report**\n`;
+    count = Everydata.direct.length + Everydata.indirect.length;
+    summary += `\n **Total Potential impact: ${count} unique downstream items across ${changedModels.length} changed Dbt models\n`;
+    summary += `\n **Directly Impacted Models:**\n ${Everydata.direct.length}\n`;
+
+    if (count <= 20) {
+      for (const task of Everydata.direct) {
+        summary += `     - ${task.name}\n`;
+      }
+    }
+    summary += `\n **Indirectly Impacted Models:**\n ${Everydata.indirect.length}\n`;
+    if (count <= 20) {
+      for (const task of Everydata.indirect) {
+        summary += `     - ${task.name}\n`;
       }
     }
 
-    // Summary output
-    let summary = `🧠 **Impact Analysis Summary**\n\n`;
 
-    summary += `\n🔗 **Directly Impacted Models:**\n`;
-    for (const task of Everydata.direct) {
-      summary += `  - ${task.name}\n`;
-    }
-
-    summary += `\n🔗 **Indirectly Impacted Models:**\n`;
-    for (const task of Everydata.indirect) {
-      summary += `  - ${task.name}\n`;
-    }
-
-    // SQL column changes
     const sqlColumnChanges = [];
+
     for (const file of changedFiles.filter(f => f.endsWith(".sql"))) {
       const baseSha = process.env.GITHUB_BASE_SHA || github.context.payload.pull_request?.base?.sha;
       const headSha = process.env.GITHUB_HEAD_SHA || github.context.payload.pull_request?.head?.sha;
@@ -232,49 +228,23 @@ const run = async () => {
 
       const baseCols = baseContent ? extractColumnsFromSQL(baseContent) : [];
       const headCols = extractColumnsFromSQL(headContent);
+
       const added = headCols.filter(col => !baseCols.includes(col));
       const removed = baseCols.filter(col => !headCols.includes(col));
 
-      summary += `\n🧾 **SQL Column Changes in ${file}:**\n`;
-      summary += `  - ➕ Added columns: ${added.join(", ") || "None"}\n`;
-      summary += `  - ➖ Removed columns: ${removed.join(", ") || "None"}\n`;
+      summary += `added columns(${added.length}): ${added}\n`;
+      summary += `removed columns(${removed.length}): ${removed}\n`;
 
       if (added.length > 0 || removed.length > 0) {
         sqlColumnChanges.push({ file, added, removed });
       }
     }
 
-    summary += `\n📄 **Changed DBT Models:**\n`;
-    if (changedModels.length === 0) {
-      summary += `- None\n`;
-    } else {
-      changedModels.forEach(m => {
-        summary += `- ${m.model}\n`;
-      });
-    }
-
-    if (columnChanges.length > 0) {
-      summary += `\n🧬 **YAML Column-Level Changes:**\n`;
-      for (const change of columnChanges) {
-        summary += `\n- \`${change.file}\`\n`;
-        if (change.added.length > 0) {
-          summary += `  - ➕ Added: ${change.added.join(", ")}\n`;
-        }
-        if (change.removed.length > 0) {
-          summary += `  - ➖ Removed: ${change.removed.join(", ")}\n`;
-        }
-        if (change.modified.length > 0) {
-          summary += `  - ✏️ Modified Columns:\n`;
-          change.modified.forEach(mod => {
-            summary += `    - ${mod.name}\n`;
-            summary += `      - old: ${JSON.stringify(mod.old)}\n`;
-            summary += `      - new: ${JSON.stringify(mod.new)}\n`;
-          });
-        }
-      }
-    }
+    summary += `added checkcolumns(${sqlColumnChanges.added.length}): ${sqlColumnChanges.added}\n`;
+    summary += `removed checkcolumns(${sqlColumnChanges.removed.length}): ${sqlColumnChanges.removed}\n`;
 
     const octokit = github.getOctokit(githubToken);
+
     if (context.payload.pull_request) {
       await octokit.rest.issues.createComment({
         owner: context.repo.owner,
@@ -289,7 +259,6 @@ const run = async () => {
     await core.summary.addRaw(summary).write();
     core.setOutput("impact_markdown", summary);
     core.setOutput("downstream_assets", JSON.stringify(directlyImpactedModels));
-
   } catch (error) {
     core.setFailed(`Error: ${error.message}`);
   }
