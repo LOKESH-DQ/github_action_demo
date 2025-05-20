@@ -232,16 +232,16 @@ const run = async () => {
       const added = headCols.filter(col => !baseCols.includes(col));
       const removed = baseCols.filter(col => !headCols.includes(col));
 
-      summary += `added columns(${added.length}): ${added}\n`;
-      summary += `removed columns(${removed.length}): ${removed}\n`;
-
       if (added.length > 0 || removed.length > 0) {
         sqlColumnChanges.push({ file, added, removed });
+        allAddedColumns.push(...added);
+        allRemovedColumns.push(...removed);
       }
     }
 
-    summary += `added checkcolumns(${sqlColumnChanges.added.length}): ${sqlColumnChanges.added}\n`;
-    summary += `removed checkcolumns(${sqlColumnChanges.removed.length}): ${sqlColumnChanges.removed}\n`;
+    summary += `\n **SQL Column Changes:**\n`;
+    summary += `added checkcolumns(${allAddedColumns.length}): ${allAddedColumns.join(", ")}\n`;
+    summary += `removed checkcolumns(${allRemovedColumns.length}): ${allRemovedColumns.join(", ")}\n`;
 
     const octokit = github.getOctokit(githubToken);
 
