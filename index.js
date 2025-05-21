@@ -96,7 +96,7 @@ const run = async () => {
       .filter(task =>
         task.connection_type === "dbt" &&
         changedModels.some(cm =>
-          cm.model === task.name
+          cm === task.name
         )
       )
       .map(task => ({
