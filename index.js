@@ -56,6 +56,7 @@ const getTasks = async () => {
 
   const response = await axios.post(taskUrl, payload, {
     headers: {
+      "Content-Type": "application/json",
       "client-id": clientId,
       "client-secret": clientSecret,
     },
@@ -71,6 +72,7 @@ const getLineageData = async (asset_id, connection_id, entity) => {
 
   const response = await axios.post(lineageUrl, body, {
     headers: {
+      "Content-Type": "application/json",
       "client-id": clientId,
       "client-secret": clientSecret,
     },
