@@ -8,6 +8,7 @@
 
 WITH customer_data AS (
 SELECT
+o.order_name,
 o.ORDER_ID,
 o.CUSTOMER_ID,
 o.ORDER_DATE,
