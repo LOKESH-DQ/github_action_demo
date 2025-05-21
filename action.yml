@@ -41,6 +41,10 @@ inputs:
     description: "GitHub token to comment on the Pull Request"
     required: true
 
+  dqlabs_base_url:
+    description: "Base URL of the DQLabs API"
+    required: true
+
 outputs:
   impact_markdown:
     description: "Markdown summary of the impact analysis"
