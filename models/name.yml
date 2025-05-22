@@ -7,5 +7,3 @@ model:
       type: string
     email:
       type: string
-    createdAt:
-      type: date
