@@ -6,7 +6,7 @@ const path = require("path");
 const yaml = require("js-yaml");
 
 // 👇 Import the SQL parser utilities
-const { extractColumnsFromSQL, getFileContent } = require("./sql-parser");
+const { extractColumnsFromSQL, getFileContent, extractColumnsFromYML } = require("./sql-parser");
 
 const clientId = core.getInput("api_client_id");
 const clientSecret = core.getInput("api_client_secret");
