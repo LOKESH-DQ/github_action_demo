@@ -110,17 +110,24 @@ const run = async () => {
     };
 
     const directlyImpactedModels = {};
+    const visitedIndirectModels = new Set(); // Track processed indirects
 
     for (const task of matchedTasks) {
       const lineageTables = await getLineageData(task.asset_id, task.connection_id, task.entity);
+      
       const allUpstreams = lineageTables.filter(table => table.flow === "upstream" && table.name !== task.name);
-      const associated_assets = []
+      const associated_assets = [];
       for (const table of allUpstreams) {
         if (table.associated_asset || table.associated_assets) {
-          associated_assets.push(table.associated_asset.name || table.associated_assets.name);
+          associated_assets.push(table.associated_asset?.name || table.associated_assets?.name);
         }
       }
-      const allDownStreams = lineageTables.filter(table => table.flow === "downstream" && table.name !== task.name && !associated_assets.includes(table.name));
+
+      const allDownStreams = lineageTables.filter(table =>
+        table.flow === "downstream" &&
+        table.name !== task.name &&
+        !associated_assets.includes(table.name)
+      );
 
       allDownStreams.forEach(table => {
         table.modelEntity = task.entity;
@@ -133,24 +140,36 @@ const run = async () => {
       Everydata.direct.push(...allDownStreams);
     }
 
-    const indirectlyImpactedModels = async (list, x, entity) => {
+    // 👇 Helper to get unique keys (name + connection ID) for visited tracking
+    const makeKey = (item) => `${item.name}-${item.connection_id}`;
+
+    // 👇 Recursive function to collect indirects, avoiding reprocessing
+    const collectIndirectImpacts = async (list, x, entity) => {
       for (const item of list) {
+        const key = makeKey(item);
+        if (visitedIndirectModels.has(key)) continue; // Skip already visited
+        visitedIndirectModels.add(key);
+
         const entity_final = x === "task" && entity ? entity : item.modelEntity;
         const lineageTables = await getLineageData(item.asset_id, item.connection_id, entity_final);
 
-        if (lineageTables.length === 0) {
-          Everydata.indirect.push(item);
-          continue;
-        }
+        const filtered = lineageTables.filter(table => {
+          return table.flow === "downstream" &&
+            table.name !== item.name &&
+            !directlyImpactedModels[table.connection_name]?.includes(table.name);
+        });
 
-        const filtered = lineageTables.filter(table => table.flow === "downstream" && table.name !== item.name);
         Everydata.indirect.push(item);
-        await indirectlyImpactedModels(filtered, "task", entity_final);
+
+        if (filtered.length > 0) {
+          // Add modelEntity to filtered so the recursion continues correctly
+          filtered.forEach(f => f.modelEntity = item.modelEntity);
+          await collectIndirectImpacts(filtered, "task", entity_final);
+        }
       }
     };
 
-    await indirectlyImpactedModels(Everydata.direct, "job", "");
-
+    await collectIndirectImpacts(Everydata.direct, "job", "");
     const uniqueModels = new Set();
 
     [...Everydata.direct, ...Everydata.indirect].forEach(item => {
