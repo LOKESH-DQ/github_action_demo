@@ -57,8 +57,6 @@ const getChangedFiles = async () => {
 
 const getTasks = async () => {
   try {
-    if (!dqlabs_base_url) return [];
-    
     const taskUrl = `${dqlabs_base_url}/api/pipeline/task/`;
     const payload = {
       chartType: 0,
@@ -132,6 +130,10 @@ const run = async () => {
 
     // Get tasks safely
     const tasks = safeArray(await getTasks());
+    if (!tasks || tasks.length === 0) {
+      summary += "No tasks found.\n";
+    }
+
     for (const task of tasks) {
       summary += `- Task: -----------------\n`;
       summary += `- Task: ${task?.name || 'Unknown'}\n`;
