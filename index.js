@@ -122,7 +122,7 @@ const run = async () => {
       }
       const allDownStreams = lineageTables.filter(table => table.flow === "downstream" && table.name !== task.name && !associated_assets.includes(table.name));
 
-      allDownStream.forEach(table => {
+      allDownStreams.forEach(table => {
         table.modelEntity = task.entity;
         if (!directlyImpactedModels[table.connection_name]) {
           directlyImpactedModels[table.connection_name] = [];
