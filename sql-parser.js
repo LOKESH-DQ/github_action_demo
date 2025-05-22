@@ -1,92 +1,71 @@
 const { execSync } = require('child_process');
 const fs = require('fs');
 const yaml = require('js-yaml');
+const path = require('path');
 
-// SQL Parser Functions
+// SQL Parser (unchanged)
 function extractColumnsFromSQL(content) {
-  // Match columns in SELECT clause with various formatting
   const selectRegex = /SELECT\s+([\s\S]+?)\s+FROM/gi;
   const matches = selectRegex.exec(content);
   if (!matches) return [];
 
-  const columnClause = matches[1]
-    // Split columns while handling complex cases
-    .split(/\s*,\s*(?![^(]*\))/) // Split on commas not inside parentheses
+  return matches[1]
+    .split(/\s*,\s*(?![^(]*\))/)
     .map(col => {
-      // Extract column name/alias
       const cleaned = col
-        .replace(/\s+as\s+.*/i, '') // Remove explicit aliases
-        .replace(/.*\./g, '') // Remove table references
+        .replace(/\s+as\s+.*/i, '')
+        .replace(/.*\./g, '')
         .trim()
-        .split(/\s+/)[0] // Get first token
-        .replace(/[`"']/g, ''); // Remove quoting
-
-      return cleaned.split('(')[0]; // Handle function calls
+        .split(/\s+/)[0]
+        .replace(/[`"']/g, '');
+      return cleaned.split('(')[0];
     })
-    .filter(col => col && !col.startsWith('--')); // Filter comments
-
-  return [...new Set(columnClause)]; // Remove duplicates
+    .filter(col => col && !col.startsWith('--'));
 }
 
-// Enhanced YML Parser Functions
-function extractColumnsFromYML(content) {
+// Enhanced YML Parser with specific support for your format
+function extractColumnsFromYML(content, filePath) {
   try {
     const schema = yaml.load(content);
     if (!schema) return [];
-    
-    const columns = [];
-    
-    // Handle different DBT YML structures
-    if (Array.isArray(schema)) {
-      // Standard array format (models/sources)
-      schema.forEach(item => {
-        if (item.columns) {
-          // Direct columns definition
-          item.columns.forEach(col => {
-            if (typeof col === 'object') columns.push(col.name);
-            else if (typeof col === 'string') columns.push(col);
-          });
-        } else if (item.models) {
-          // Nested models definition
-          item.models.forEach(model => {
-            if (model.columns) {
-              model.columns.forEach(col => columns.push(col.name));
-            }
-          });
-        }
-      });
-    } else if (typeof schema === 'object') {
-      // Single model definition or versioned schema
-      if (schema.columns) {
-        // Version 1 schema
-        Object.values(schema.columns).forEach(col => {
-          columns.push(col.name);
-        });
-      } else if (schema.models) {
-        // Version 2 schema with models key
-        schema.models.forEach(model => {
-          if (model.columns) {
-            Object.values(model.columns).forEach(col => {
-              columns.push(col.name);
-            });
-          }
-        });
-      }
+
+    // Handle your specific format (model.attributes)
+    if (schema.model?.attributes) {
+      return Object.keys(schema.model.attributes);
     }
-    
-    return [...new Set(columns)]; // Remove duplicates
+    // Handle standard DBT schema format (backward compatibility)
+    else if (Array.isArray(schema)) {
+      const modelName = path.basename(filePath, '.yml');
+      const model = schema.find(m => m.name === modelName);
+      return model?.columns?.map(col => col.name || col) || [];
+    }
+    // Handle direct columns definition
+    else if (schema.columns) {
+      return schema.columns.map(col => col.name || col);
+    }
+
+    return [];
   } catch (e) {
-    console.error("YML parsing error:", e);
+    console.error(`YML parsing error (${path.basename(filePath)}):`, e.message);
     return [];
   }
 }
 
-// Git Helper Function
+// Enhanced Git Helper with better error handling
 function getFileContent(sha, filePath) {
   try {
-    return execSync(`git show ${sha}:${filePath}`).toString();
+    return execSync(`git show ${sha}:${filePath}`, { 
+      stdio: ['pipe', 'pipe', 'ignore'],
+      encoding: 'utf-8',
+      maxBuffer: 10 * 1024 * 1024 // 10MB buffer for large files
+    });
   } catch (error) {
-    return null; // File deleted in head
+    if (error.message.includes('exists on disk, but not in')) {
+      console.log(`File not found in ${sha}: ${filePath}`);
+    } else {
+      console.error(`Error reading ${filePath}:`, error.message);
+    }
+    return null;
   }
 }
 
