@@ -86,31 +86,26 @@ const getTasks = async () => {
 };
 
 const getLineageData = async (asset_id, connection_id, entity) => {
-  try {
-    if (!asset_id || !connection_id || !entity) return [];
-    
-    const lineageUrl = `${dqlabs_base_url}/api/lineage/entities/linked/`;
-    core.info(`[getLineageData] Fetching from: ${lineageUrl}`);
-    
-    const response = await axios.post(lineageUrl, {
-      asset_id,
-      connection_id,
-      entity
-    }, {
+  const lineageUrl = `${baseUrl}lineage/`;
+  const body = {
+    asset_id,
+    connection_id,
+    entity,
+  };
+ 
+  const response = await axios.post(
+    lineageUrl,
+    body,
+    {
       headers: {
-        "Content-Type": "application/json",
         "client-id": clientId,
         "client-secret": clientSecret,
-      }
-    });
-
-    return response?.data?.response?.data?.tables;
-  } catch (error) {
-    core.error(`[getLineageData] Error: ${error.message}`);
-    return [];
-  }
+      },
+    }
+  );
+ 
+  return response.data.response.data.tables;
 };
-
 const run = async () => {
   try {
     // Initialize summary with basic info
@@ -162,11 +157,11 @@ const run = async () => {
     };
 
     for (const task of matchedTasks) {
-      const lineageTables = safeArray(await getLineageData(
+      const lineageTables = await getLineageData(
         task.asset_id,
         task.connection_id,
         task.entity
-      ));
+      );
 
       const lineageData = lineageTables
         .filter(table => table?.flow === "downstream")
