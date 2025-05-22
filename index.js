@@ -105,82 +105,74 @@ const run = async () => {
       }));
 
     const Everydata = {
-      direct: [],
-      indirect: [],
+      direct: new Map(),    // Changed to Map for deduplication
+      indirect: new Map(),  // Changed to Map for deduplication
+      processed: new Set()  // Track processed entities
     };
 
-    const directlyImpactedModels = {};
+    // ... [previous code until directlyImpactedModels]
 
     for (const task of matchedTasks) {
       const lineageTables = await getLineageData(task.asset_id, task.connection_id, task.entity);
-      const allUpstreams = lineageTables.filter(table => table.flow === "upstream" && table.name !== task.name);
-      const associated_assets = []
-      for (const table of allUpstreams) {
-        if (table.associated_asset || table.associated_assets) {
-          associated_assets.push(table.associated_asset.name || table.associated_assets.name);
-        }
-      }
-      const allDownStreams = lineageTables.filter(table => table.flow === "downstream" && table.name !== task.name && !associated_assets.includes(table.name));
+      
+      // Track direct impacts
+      const allDownStreams = lineageTables.filter(table => 
+        table.flow === "downstream" && 
+        table.name !== task.name &&
+        !associated_assets.includes(table.name)
+      );
 
       allDownStreams.forEach(table => {
         table.modelEntity = task.entity;
-        if (!directlyImpactedModels[table.connection_name]) {
-          directlyImpactedModels[table.connection_name] = [];
+        if (!Everydata.direct.has(table.name)) {
+          Everydata.direct.set(table.name, table);
         }
-        directlyImpactedModels[table.connection_name].push(table.name);
       });
-
-      Everydata.direct.push(...allDownStreams);
     }
 
-    const indirectlyImpactedModels = async (list, x, entity) => {
-      for (const item of list) {
-        const entity_final = x === "task" && entity ? entity : item.modelEntity;
-        const lineageTables = await getLineageData(item.asset_id, item.connection_id, entity_final);
-        if (lineageTables.length === 0) {
-          Everydata.indirect.push(item);
-          continue;
-        } else {
-          const inUpstreams = lineageTables.filter(table => table.flow === "upstream" && table.name !== item.name);
-          const associated_assets = []
-          for (const table of inUpstreams) {
-            if (table.associated_asset || table.associated_assets) {
-              associated_assets.push(table.associated_asset.name || table.associated_assets.name);
-            }
-          }
-          const inDownStreams = lineageTables.filter(table => table.flow === "downstream" && table.name !== item.name && !associated_assets.includes(table.name));
+    // Improved indirect impact analysis
+    const indirectlyImpactedModels = async (impactSources) => {
+      for (const [_, item] of impactSources) {
+        if (Everydata.processed.has(item.name)) continue;
+        
+        Everydata.processed.add(item.name);
+        const lineageTables = await getLineageData(
+          item.asset_id, 
+          item.connection_id, 
+          item.modelEntity
+        );
 
+        const newDownstreams = lineageTables.filter(table => 
+          table.flow === "downstream" && 
+          table.name !== item.name &&
+          !Everydata.direct.has(table.name) &&  // Not already direct
+          !Everydata.indirect.has(table.name)   // Not already indirect
+        );
+
+        for (const table of newDownstreams) {
+          table.modelEntity = item.modelEntity;
+          Everydata.indirect.set(table.name, table);
+          await indirectlyImpactedModels(new Map([[table.name, table]]));
         }
-        Everydata.indirect.push(item);
-        await indirectlyImpactedModels(inDownStreams, "task", entity_final);
       }
     };
 
-    await indirectlyImpactedModels(Everydata.direct, "job", "");
+    await indirectlyImpactedModels(Everydata.direct);
 
-    const uniqueModels = new Set();
-
-    [...Everydata.direct, ...Everydata.indirect].forEach(item => {
-      if (item.name) uniqueModels.add(item.name);
+    const totalImpacted = Everydata.direct.size + Everydata.indirect.size;
+    
+    summary += `\n**Total Potential Impact:** ${totalImpacted} unique downstream items\n`;
+    summary += `**Changed Models:** ${changedModels.length}\n`;
+    
+    summary += `\n**Directly Impacted Models (${Everydata.direct.size}):**\n`;
+    Everydata.direct.forEach((model, name) => {
+      summary += `- ${name}\n`;
     });
-
-    let summary = `\n **DQLabs Impact Report**\n`;
-    count = uniqueModels.size;
-    summary += `\n **Total Potential impact: ${count} unique downstream items across ${changedModels.length} changed Dbt models\n`;
-    summary += `\n **Directly Impacted Models:** ${Everydata.direct.length}\n`;
-
-    if (count <= 20) {
-      for (const task of Everydata.direct) {
-        summary += `     - ${task.name}\n`;
-      }
-    }
-    summary += `\n **Indirectly Impacted Models:** ${Everydata.indirect.length}\n`;
-    if (count <= 20) {
-      for (const task of Everydata.indirect) {
-        summary += `     - ${task.name}\n`;
-      }
-    }
-
+    
+    summary += `\n**Indirectly Impacted Models (${Everydata.indirect.size}):**\n`;
+    Everydata.indirect.forEach((model, name) => {
+      summary += `- ${name}\n`;
+    });
 
     const sqlColumnChanges = [];
     let allAddedColumns = [];
