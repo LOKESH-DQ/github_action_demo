@@ -49,8 +49,6 @@ outputs:
   impact_markdown:
     description: "Markdown summary of the impact analysis"
 
-  downstream_assets:
-    description: "JSON string of downstream assets"
 
 runs:
   using: "node16"

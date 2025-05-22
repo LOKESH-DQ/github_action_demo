@@ -109,29 +109,29 @@ const run = async () => {
       indirect: []
     };
 
-    const directlyImpactedModels = {};
     for (const task of matchedTasks) {
       const lineageTables = await getLineageData(task.asset_id, task.connection_id, task.entity);
-      const lineageData = lineageTables.filter(table => table.flow === "downstream" && table.name !== task.name);
-      lineageData.forEach(table => {
-        if (!directlyImpactedModels[table.connection_name]) {
-          directlyImpactedModels[table.connection_name] = [];
-        }
-        directlyImpactedModels[table.connection_name].push(table.name);
-      });
+      
+      let lineageData = [];
+      if (Array.isArray(lineageTables) || lineageTables.length > 0) {
+        lineageData = lineageTables.filter(table => table.flow === "downstream");
+      }
+
+      Everydata.direct.push(...lineageData);
     }
-    
-    Everydata.direct.push(...lineageData);
 
     const indirectlyImpactedModels = async (list) => {
       for (const item of list) {
         const lineageTables = await getLineageData(item.asset_id, item.connection_id, item.entity);
-        if (lineageTables.length === 0) {
-          Everydata.indirect.push(...item);
+        
+        if (!Array.isArray(lineageTables) || lineageTables.length === 0) {
+          Everydata.indirect.push(item);
           continue;
-        } else {
-          indirectlyImpactedModels(item);
-        }       // You can process lineageData here as needed
+        }
+
+        const lineageData = lineageTables.filter(table => table.flow === "downstream");
+        Everydata.indirect.push(item); // Push current item to indirect
+        await indirectlyImpactedModels(lineageData); // Recurse on downstream items
       }
     };
 
@@ -225,7 +225,6 @@ const run = async () => {
 
     await core.summary.addRaw(summary).write();
     core.setOutput("impact_markdown", summary);
-    core.setOutput("downstream_assets", JSON.stringify(directlyImpactedModels));
   } // <-- Add this closing brace to end the try block
   catch (error) {
     core.setFailed(`Error: ${error.message}`);
