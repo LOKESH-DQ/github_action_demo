@@ -132,6 +132,13 @@ const run = async () => {
 
     // Get tasks safely
     const tasks = safeArray(await getTasks());
+    for (const task of tasks) {
+      summary += `- Task: -----------------\n`;
+      summary += `- Task: ${task?.name || 'Unknown'}\n`;
+      summary += `  - ID: ${task?.task_id || 'Unknown'}\n`;
+      summary += `  - Connection: ${task?.connection_id || 'Unknown'}\n`;
+      summary += `  - Asset: ${task?.asset_id || 'Unknown'}\n`;
+    }
     core.info(`Found ${tasks.length} tasks`);
 
     // Match tasks with changed models
@@ -141,8 +148,16 @@ const run = async () => {
       .map(task => ({
         ...task,
         entity: task?.task_id || ""
-      }))
-      .filter(task => task.entity);
+      }));
+
+    for (const task of matchedTasks) {
+      summary += `\n### Matched Task\n`;
+      summary += `- Task: ${task?.name || 'Unknown'}\n`;
+      summary += `  - ID: ${task?.task_id || 'Unknown'}\n`;
+      summary += `  - Connection: ${task?.connection_id || 'Unknown'}\n`;
+      summary += `  - Asset: ${task?.asset_id || 'Unknown'}\n`;
+      summary += `  - Entity: ${task?.entity || 'Unknown'}\n`;
+    }
 
     core.info(`Matched ${matchedTasks.length} tasks with changed models`);
 
