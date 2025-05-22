@@ -139,17 +139,16 @@ const run = async () => {
 
     const totalImpacted = Everydata.direct.length + Everydata.indirect.length;
     
-    summary += `\n**Total Potential Impact:** ${totalImpacted} unique downstream items\n`;
+    summary = `\n**Total Potential Impact:** ${totalImpacted} unique downstream items\n`;
     summary += `**Changed Models:** ${changedModels.length}\n`;
     
-    summary += `\n**Directly Impacted Models (${Everydata.direct.size}):**\n`;
-    Everydata.direct.forEach((model, name) => {
-      summary += `- ${name}\n`;
+    summary += `\n**Directly Impacted Models (${Everydata.direct.length}):**\n`;
+    Everydata.direct.forEach(model => {
+      summary += `- ${model.name}\n`;
     });
-    
-    summary += `\n**Indirectly Impacted Models (${Everydata.indirect.size}):**\n`;
-    Everydata.indirect.forEach((model, name) => {
-      summary += `- ${name}\n`;
+    summary += `\n**Indirectly Impacted Models (${Everydata.indirect.length}):**\n`;
+    Everydata.indirect.forEach(model => {
+      summary += `- ${model.name}\n`;
     });
 
     const sqlColumnChanges = [];
