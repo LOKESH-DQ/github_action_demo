@@ -1,58 +1,3 @@
-# name: "DBT Impact Analysis on PR"
-
-# on:
-#   pull_request:
-#     paths:
-#       - '**/*.sql'
-#       - '**/*.yml'
-
-# jobs:
-#   impact-analysis:
-#     runs-on: ubuntu-latest
-
-#     steps:
-#       - name: Checkout code
-#         uses: actions/checkout@v4
-
-#       - name: Get changed files
-#         id: changed-files
-#         uses: tj-actions/changed-files@v39
-#         with:
-#           files: |
-#             **/*.sql
-#             **/*.yml
-
-#       - name: Print changed SQL/YML files
-#         run: |
-#           echo "Changed SQL/YML files:"
-#           echo "${{ steps.changed-files.outputs.all_changed_files }}"
-
-#       - name: Debug - Check if secrets are set
-#         run: |
-#           if [ -z "${{ secrets.DQLABS_API_CLIENT_ID }}" ]; then
-#             echo "Client ID is missing"
-#           else
-#             echo "Client ID is set"
-#           fi
-
-#           if [ -z "${{ secrets.DQLABS_API_CLIENT_SECRET }}" ]; then
-#             echo "Client Secret is missing"
-#           else
-#             echo "Client Secret is set"
-#           fi
-
-#       - name: Fetch DQLabs Assets
-#         run: |
-#           echo "Fetching DQLabs DBT Assets..."
-
-#           response=$(curl -s -X GET "http://44.238.88.190:8000/api/asset/" \
-#             -H "client-id: ${{ secrets.DQLABS_API_CLIENT_ID }}" \
-#             -H "client-secret: ${{ secrets.DQLABS_API_CLIENT_SECRET }}" \
-#             -H "Content-Type: application/json")
-
-#           echo "DBT Assets:"
-#           echo "$response"
-
 name: "DBT Impact Analysis on PR"
 
 on:
@@ -70,21 +15,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout the PR branch (head)
       - name: Checkout PR code (head)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      # # Checkout the base branch code into a separate folder 'base'
-      # - name: Checkout base branch code
-      #   uses: actions/checkout@v4
-      #   with:
-      #     ref: ${{ github.event.pull_request.base.ref }}
-      #     path: base
-      #     fetch-depth: 0
-
-      # Get changed files between base and head
       - name: Get changed DBT files
         id: changes
         uses: tj-actions/changed-files@v46
@@ -96,7 +30,6 @@ jobs:
           include_renamed: true
           separator: ","
 
-      # Run your custom impact analysis action more actions
       - name: Run DQLabs Impact Analysis
         id: impact-analysis
         uses: LOKESH-DQ/github_action_demo@main
@@ -107,13 +40,9 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           dqlabs_base_url: ${{ secrets.DQLABS_BASE_URL }}
 
-
-      # Show summary logs for debugging
       - name: Show Summary in Logs
         run: echo "${{ steps.impact-analysis.outputs.impact_markdown }}"
 
-
-      # Debug changed files info
       - name: Debug changed files
         run: |
           echo "All files: ${{ steps.changes.outputs.all_files }}"

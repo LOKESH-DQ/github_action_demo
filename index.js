@@ -110,24 +110,17 @@ const run = async () => {
     };
 
     const directlyImpactedModels = {};
-    const visitedIndirectModels = new Set(); // Track processed indirects
 
     for (const task of matchedTasks) {
       const lineageTables = await getLineageData(task.asset_id, task.connection_id, task.entity);
-      
       const allUpstreams = lineageTables.filter(table => table.flow === "upstream" && table.name !== task.name);
-      const associated_assets = [];
+      const associated_assets = []
       for (const table of allUpstreams) {
         if (table.associated_asset || table.associated_assets) {
-          associated_assets.push(table.associated_asset?.name || table.associated_assets?.name);
+          associated_assets.push(table.associated_asset.name || table.associated_assets.name);
         }
       }
-
-      const allDownStreams = lineageTables.filter(table =>
-        table.flow === "downstream" &&
-        table.name !== task.name &&
-        !associated_assets.includes(table.name)
-      );
+      const allDownStreams = lineageTables.filter(table => table.flow === "downstream" && table.name !== task.name && !associated_assets.includes(table.name));
 
       allDownStreams.forEach(table => {
         table.modelEntity = task.entity;
@@ -140,36 +133,31 @@ const run = async () => {
       Everydata.direct.push(...allDownStreams);
     }
 
-    // 👇 Helper to get unique keys (name + connection ID) for visited tracking
-    const makeKey = (item) => `${item.name}-${item.connection_id}`;
-
-    // 👇 Recursive function to collect indirects, avoiding reprocessing
-    const collectIndirectImpacts = async (list, x, entity) => {
+    const indirectlyImpactedModels = async (list, x, entity) => {
       for (const item of list) {
-        const key = makeKey(item);
-        if (visitedIndirectModels.has(key)) continue; // Skip already visited
-        visitedIndirectModels.add(key);
-
         const entity_final = x === "task" && entity ? entity : item.modelEntity;
         const lineageTables = await getLineageData(item.asset_id, item.connection_id, entity_final);
+        if (lineageTables.length === 0) {
+          Everydata.indirect.push(item);
+          continue;
+        } else {
+          const inUpstreams = lineageTables.filter(table => table.flow === "upstream" && table.name !== item.name);
+          const associated_assets = []
+          for (const table of inUpstreams) {
+            if (table.associated_asset || table.associated_assets) {
+              associated_assets.push(table.associated_asset.name || table.associated_assets.name);
+            }
+          }
+          const inDownStreams = lineageTables.filter(table => table.flow === "downstream" && table.name !== item.name && !associated_assets.includes(table.name));
 
-        const filtered = lineageTables.filter(table => {
-          return table.flow === "downstream" &&
-            table.name !== item.name &&
-            !directlyImpactedModels[table.connection_name]?.includes(table.name);
-        });
-
-        Everydata.indirect.push(item);
-
-        if (filtered.length > 0) {
-          // Add modelEntity to filtered so the recursion continues correctly
-          filtered.forEach(f => f.modelEntity = item.modelEntity);
-          await collectIndirectImpacts(filtered, "task", entity_final);
         }
+        Everydata.indirect.push(item);
+        await indirectlyImpactedModels(inDownStreams, "task", entity_final);
       }
     };
 
-    await collectIndirectImpacts(Everydata.direct, "job", "");
+    await indirectlyImpactedModels(Everydata.direct, "job", "");
+
     const uniqueModels = new Set();
 
     [...Everydata.direct, ...Everydata.indirect].forEach(item => {
@@ -222,6 +210,36 @@ const run = async () => {
     summary += `\n **Column Changes:**\n`;
     summary += `added checkcolumns(${allAddedColumns.length}): ${allAddedColumns.join(", ")}\n`;
     summary += `removed checkcolumns(${allRemovedColumns.length}): ${allRemovedColumns.join(", ")}\n`;
+
+    const ymlColumnChanges = [];
+    let allAddedYmlColumns = [];
+    let allRemovedYmlColumns = [];
+
+    for (const file of changedFiles.filter(f => f.endsWith(".yml"))) {
+      const baseSha = process.env.GITHUB_BASE_SHA || github.context.payload.pull_request?.base?.sha;
+      const headSha = process.env.GITHUB_HEAD_SHA || github.context.payload.pull_request?.head?.sha;
+      const baseContent = getFileContent(baseSha, file);
+      const headContent = getFileContent(headSha, file);
+
+      if (!headContent) continue;
+
+      const baseCols = baseContent ? extractColumnsFromYML(baseContent) : [];
+      const headCols = extractColumnsFromYML(headContent);
+
+      const added = headCols.filter(col => !baseCols.includes(col));
+      const removed = baseCols.filter(col => !headCols.includes(col));
+
+      if (added.length > 0 || removed.length > 0) {
+        ymlColumnChanges.push({ file, added, removed });
+        allAddedYmlColumns.push(...added);
+        allRemovedYmlColumns.push(...removed);
+      }
+    }
+
+    // Update the summary with YML changes
+    summary += `\n **YML Column Changes:**\n`;
+    summary += `Added ymlcolumns (${allAddedYmlColumns.length}): ${allAddedYmlColumns.join(", ")}\n`;
+    summary += `Removed ymlcolumns (${allRemovedYmlColumns.length}): ${allRemovedYmlColumns.join(", ")}\n`;
 
     const octokit = github.getOctokit(githubToken);
 
