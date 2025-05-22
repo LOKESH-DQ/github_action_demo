@@ -86,7 +86,7 @@ const getTasks = async () => {
 };
 
 const getLineageData = async (asset_id, connection_id, entity) => {
-  const lineageUrl = `${baseUrl}lineage/`;
+  const lineageUrl = `${baseUrl}/api/lineage/entities/linked/`;
   const body = {
     asset_id,
     connection_id,
