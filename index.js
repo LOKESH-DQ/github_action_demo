@@ -113,9 +113,16 @@ const run = async () => {
 
     for (const task of matchedTasks) {
       const lineageTables = await getLineageData(task.asset_id, task.connection_id, task.entity);
-      const lineageData = lineageTables.filter(table => table.flow === "downstream" && table.name !== task.name);
+      const allUpstreams = lineageTables.filter(table => table.flow === "upstream" && table.name !== task.name);
+      const associated_assets = []
+      for (const table of allUpstreams) {
+        if (table.associated_asset || table.associated_assets) {
+          associated_assets.push(table.associated_asset.name || table.associated_assets.name);
+        }
+      }
+      const allDownStreams = lineageTables.filter(table => table.flow === "downstream" && table.name !== task.name && !associated_assets.includes(table.name));
 
-      lineageData.forEach(table => {
+      allDownStream.forEach(table => {
         table.modelEntity = task.entity;
         if (!directlyImpactedModels[table.connection_name]) {
           directlyImpactedModels[table.connection_name] = [];
@@ -123,7 +130,7 @@ const run = async () => {
         directlyImpactedModels[table.connection_name].push(table.name);
       });
 
-      Everydata.direct.push(...lineageData);
+      Everydata.direct.push(...allDownStreams);
     }
 
     const indirectlyImpactedModels = async (list, x, entity) => {
@@ -213,7 +220,8 @@ const run = async () => {
     await core.summary.addRaw(summary).write();
     core.setOutput("impact_markdown", summary);
     core.setOutput("downstream_assets", JSON.stringify(directlyImpactedModels));
-  } catch (error) {
+  } // <-- Add this closing brace to end the try block
+  catch (error) {
     core.setFailed(`Error: ${error.message}`);
   }
 };
