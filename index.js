@@ -87,7 +87,7 @@ const run = async () => {
     const changedFiles = await getChangedFiles();
 
     const changedModels = changedFiles
-      .filter(file => file.endsWith(".yml") || file.endsWith(".sql"))
+      .filter(file => file.endsWith(".sql"))
       .map(file => path.basename(file, path.extname(file)));
 
     const tasks = await getTasks();
