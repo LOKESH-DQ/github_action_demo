@@ -87,7 +87,7 @@ const getTasks = async () => {
 
 const getLineageData = async (asset_id, connection_id, entity) => {
   const lineageUrl = `${dqlabs_base_url}/api/lineage/entities/linked/`;
-  const body = {
+  const payload = {
     asset_id,
     connection_id,
     entity,
@@ -95,9 +95,10 @@ const getLineageData = async (asset_id, connection_id, entity) => {
  
   const response = await axios.post(
     lineageUrl,
-    body,
+    payload,
     {
       headers: {
+        "Content-Type": "application/json",
         "client-id": clientId,
         "client-secret": clientSecret,
       },
