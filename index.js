@@ -75,11 +75,10 @@ const getTasks = async () => {
         "Content-Type": "application/json",
         "client-id": clientId,
         "client-secret": clientSecret,
-      },
-      validateStatus: () => true // Don't throw on HTTP errors
+      }
     });
 
-    return safeArray(response?.data?.response?.data);
+    return response?.data?.response?.data;
   } catch (error) {
     core.error(`[getTasks] Error: ${error.message}`);
     return [];
