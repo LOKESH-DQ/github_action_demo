@@ -82,10 +82,10 @@ const getLineageData = async (asset_id, connection_id, entity) => {
 };
 
 const run = async () => {
+
   try {
     const context = github.context;
     const changedFiles = await getChangedFiles();
-
     const changedModels = changedFiles
       .filter(file => file.endsWith(".yml") || file.endsWith(".sql"))
       .map(file => path.basename(file, path.extname(file)));
@@ -143,13 +143,11 @@ const run = async () => {
     };
 
     await indirectlyImpactedModels(Everydata.direct, "job", "");
-
     const uniqueModels = new Set();
 
     [...Everydata.direct, ...Everydata.indirect].forEach(item => {
       if (item.name) uniqueModels.add(item.name);
     });
-
     let summary = `\n **DQLabs Impact Report**\n`;
     count = uniqueModels.size;
     summary += `\n **Total Potential impact: ${count} unique downstream items across ${changedModels.length} changed Dbt models\n`;
@@ -166,8 +164,6 @@ const run = async () => {
         summary += `     - ${task.name}\n`;
       }
     }
-
-
     const sqlColumnChanges = [];
     let allAddedColumns = [];
     let allRemovedColumns = [];
@@ -177,7 +173,6 @@ const run = async () => {
       const headSha = process.env.GITHUB_HEAD_SHA || github.context.payload.pull_request?.head?.sha;
       const baseContent = getFileContent(baseSha, file);
       const headContent = getFileContent(headSha, file);
-
       if (!headContent) continue;
 
       const baseCols = baseContent ? extractColumnsFromSQL(baseContent) : [];
@@ -185,7 +180,6 @@ const run = async () => {
 
       const added = headCols.filter(col => !baseCols.includes(col));
       const removed = baseCols.filter(col => !headCols.includes(col));
-
       if (added.length > 0 || removed.length > 0) {
         sqlColumnChanges.push({ file, added, removed });
         allAddedColumns.push(...added);
@@ -217,5 +211,3 @@ const run = async () => {
     core.setFailed(`Error: ${error.message}`);
   }
 };
-
-run();
