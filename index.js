@@ -127,11 +127,11 @@ const run = async () => {
         if (!Array.isArray(lineageTables) || lineageTables.length === 0) {
           Everydata.indirect.push(item);
           continue;
+        } else {
+          const lineageData = lineageTables.filter(table => table.flow === "downstream");
+          Everydata.indirect.push(item); // Push current item to indirect
+          await indirectlyImpactedModels(lineageData); // Recurse on downstream items
         }
-
-        const lineageData = lineageTables.filter(table => table.flow === "downstream");
-        Everydata.indirect.push(item); // Push current item to indirect
-        await indirectlyImpactedModels(lineageData); // Recurse on downstream items
       }
     };
 
