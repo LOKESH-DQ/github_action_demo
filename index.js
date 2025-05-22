@@ -101,8 +101,7 @@ const getLineageData = async (asset_id, connection_id, entity) => {
         "Content-Type": "application/json",
         "client-id": clientId,
         "client-secret": clientSecret,
-      },
-      validateStatus: () => true
+      }
     });
 
     return response?.data?.response?.data?.tables;
@@ -131,14 +130,8 @@ const run = async () => {
     const tasks = await getTasks();
     if (!tasks || tasks.length === 0) {
       summary += "No tasks found.\n";
-    }
-
-    for (const task of tasks) {
-      summary += `- Task: -----------------\n`;
-      summary += `- Task: ${task?.name || 'Unknown'}\n`;
-      summary += `  - ID: ${task?.task_id || 'Unknown'}\n`;
-      summary += `  - Connection: ${task?.connection_id || 'Unknown'}\n`;
-      summary += `  - Asset: ${task?.asset_id || 'Unknown'}\n`;
+    } else {
+      summary += `Found ${tasks.length} tasks.\n`;
     }
     core.info(`Found ${tasks.length} tasks`);
 
