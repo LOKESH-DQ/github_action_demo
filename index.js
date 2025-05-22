@@ -86,7 +86,7 @@ const getTasks = async () => {
 };
 
 const getLineageData = async (asset_id, connection_id, entity) => {
-  const lineageUrl = `${baseUrl}/api/lineage/entities/linked/`;
+  const lineageUrl = `${dqlabs_base_url}/api/lineage/entities/linked/`;
   const body = {
     asset_id,
     connection_id,
@@ -104,7 +104,7 @@ const getLineageData = async (asset_id, connection_id, entity) => {
     }
   );
  
-  return response.data.response.data.tables;
+  return response?.data?.response?.data?.tables;
 };
 const run = async () => {
   try {
