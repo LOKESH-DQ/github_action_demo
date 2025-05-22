@@ -106,7 +106,7 @@ const getLineageData = async (asset_id, connection_id, entity) => {
       validateStatus: () => true
     });
 
-    return safeArray(response?.data?.response?.data?.tables);
+    return response?.data?.response?.data?.tables;
   } catch (error) {
     core.error(`[getLineageData] Error: ${error.message}`);
     return [];
@@ -129,7 +129,7 @@ const run = async () => {
       .filter(Boolean);
 
     // Get tasks safely
-    const tasks = safeArray(await getTasks());
+    const tasks = await getTasks();
     if (!tasks || tasks.length === 0) {
       summary += "No tasks found.\n";
     }
