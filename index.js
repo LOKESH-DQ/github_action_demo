@@ -88,10 +88,10 @@ const getTasks = async () => {
 const getLineageData = async (asset_id, connection_id, entity) => {
   try {
     if (!asset_id || !connection_id || !entity) return [];
-
+    
     const lineageUrl = `${dqlabs_base_url}/api/lineage/entities/linked/`;
     core.info(`[getLineageData] Fetching from: ${lineageUrl}`);
-
+    
     const response = await axios.post(lineageUrl, {
       asset_id,
       connection_id,
@@ -101,14 +101,37 @@ const getLineageData = async (asset_id, connection_id, entity) => {
         "Content-Type": "application/json",
         "client-id": clientId,
         "client-secret": clientSecret,
-      },
-      validateStatus: () => true
+      }
     });
 
     return response?.data?.response?.data?.tables;
+  } catch (error) {
+    core.error(`[getLineageData] Error: ${error.message}`);
+    return [];
+  }
+};
+
+const run = async () => {
+  try {
+    // Initialize summary with basic info
+    let summary = "## Impact Analysis Report\n\n";
+    
+    // Get changed files safely
+    const changedFiles = safeArray(await getChangedFiles());
+    core.info(`Found ${changedFiles.length} changed files`);
+    
+    // Process changed SQL models
+    const changedModels = changedFiles
+      .filter(file => file && typeof file === "string" && file.endsWith(".sql"))
+      .map(file => path.basename(file, path.extname(file)))
+      .filter(Boolean);
+
+    // Get tasks safely
     const tasks = await getTasks();
     if (!tasks || tasks.length === 0) {
       summary += "No tasks found.\n";
+    } else {
+      summary += `Found ${tasks.length} tasks.\n`;
     }
     core.info(`Found ${tasks.length} tasks`);
 
@@ -162,7 +185,7 @@ const getLineageData = async (asset_id, connection_id, entity) => {
         ));
 
         Everydata.indirect.push(item);
-
+        
         if (lineageTables.length > 0) {
           const downstream = lineageTables
             .filter(table => table?.flow === "downstream")
@@ -199,7 +222,7 @@ const getLineageData = async (asset_id, connection_id, entity) => {
         try {
           const baseSha = process.env.GITHUB_BASE_SHA || github.context.payload.pull_request?.base?.sha;
           const headSha = process.env.GITHUB_HEAD_SHA || github.context.payload.pull_request?.head?.sha;
-
+          
           const baseContent = baseSha ? await getFileContent(baseSha, file) : null;
           const headContent = await getFileContent(headSha, file);
           if (!headContent) continue;
@@ -254,7 +277,7 @@ const getLineageData = async (asset_id, connection_id, entity) => {
     await core.summary
       .addRaw(summary)
       .write();
-
+      
     core.setOutput("impact_markdown", summary);
   } catch (error) {
     core.setFailed(`[MAIN] Unhandled error: ${error.message}`);
@@ -264,4 +287,5 @@ const getLineageData = async (asset_id, connection_id, entity) => {
 
 // Execute
 run().catch(error => {
-  core.setFailed(`[UNCAUGHT] Critical failure: ${error.message}`)});
+  core.setFailed(`[UNCAUGHT] Critical failure: ${error.message}`);
+});
