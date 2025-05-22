@@ -88,7 +88,12 @@ const run = async () => {
 
     const changedModels = changedFiles
       .filter(file => file.endsWith(".yml") || file.endsWith(".sql"))
-      .map(file => path.basename(file, path.extname(file)));
+      .map(file => {
+        const parts = file.split(path.sep);
+        const model = path.basename(file, path.extname(file));
+        const job = parts.length >= 2 ? parts[parts.length - 2] : null;
+        return { job, model };
+      });
 
     const tasks = await getTasks();
 
@@ -96,11 +101,14 @@ const run = async () => {
       .filter(task =>
         task.connection_type === "dbt" &&
         changedModels.some(cm =>
-          cm === task.name
+          cm.model === task.name && cm.job === task.job_name
         )
       )
       .map(task => ({
-        ...task,
+        name: task.name,
+        asset_id: task.asset_id,
+        connection_id: task.connection_id,
+        connection_name: task.connection_name,
         entity: task.task_id,
       }));
 
