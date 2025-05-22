@@ -8,7 +8,6 @@
 
 WITH customer_data AS (
 SELECT
-o.ORDER_DATE,
 o.STATUS,
 c.FIRST_NAME,
 ROW_NUMBER() OVER (ORDER BY o.ORDER_DATE DESC) AS row_num
