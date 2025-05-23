@@ -106,7 +106,7 @@ const getLineageData = async (asset_id, connection_id, entity) => {
       }
     );
  
-    return safeArray(response?.data?.response?.data?.tables);
+    return safeArray(response?.data?.response?.data);
   } catch (error) {
     core.error(`[getLineageData] Error for ${entity}: ${error.message}`);
     return [];
@@ -178,26 +178,27 @@ const run = async () => {
     }
 
     // Process indirect impacts
-    const processIndirectImpacts = async (items) => {
+    const processIndirectImpacts = async (items, x) => {
       for (const item of safeArray(items)) {
+        if (x === "second" ) {
+          Everydata.indirect.push(item);
+        }
         const lineageTables = await getLineageData(
           item.asset_id,
           item.connection_id,
           item.entity
         );
-
-        Everydata.indirect.push(item);
         
         if (lineageTables && lineageTables.length > 0) {
           const downstream = lineageTables
             .filter(table => table?.flow === "downstream")
             .filter(Boolean);
-          await processIndirectImpacts(downstream);
+          await processIndirectImpacts(downstream, "second");
         }
       }
     };
 
-    await processIndirectImpacts(Everydata.direct);
+    await processIndirectImpacts(Everydata.direct, "first");
 
     // Build summary
     const totalImpacted = Everydata.direct.length + Everydata.indirect.length;
