@@ -78,7 +78,7 @@ const getTasks = async () => {
       }
     });
 
-    return response?.data?.response?.data;
+    return response?.data?.response?.data || [];
   } catch (error) {
     core.error(`[getTasks] Error: ${error.message}`);
     return [];
@@ -86,27 +86,33 @@ const getTasks = async () => {
 };
 
 const getLineageData = async (asset_id, connection_id, entity) => {
-  const lineageUrl = `${dqlabs_base_url}/api/lineage/entities/linked/`;
-  const payload = {
-    asset_id,
-    connection_id,
-    entity,
-  };
+  try {
+    const lineageUrl = `${dqlabs_base_url}/api/lineage/entities/linked/`;
+    const payload = {
+      asset_id,
+      connection_id,
+      entity,
+    };
  
-  const response = await axios.post(
-    lineageUrl,
-    payload,
-    {
-      headers: {
-        "Content-Type": "application/json",
-        "client-id": clientId,
-        "client-secret": clientSecret,
-      },
-    }
-  );
+    const response = await axios.post(
+      lineageUrl,
+      payload,
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "client-id": clientId,
+          "client-secret": clientSecret,
+        },
+      }
+    );
  
-  return response?.data?.response?.data?.tables;
+    return safeArray(response?.data?.response?.data?.tables);
+  } catch (error) {
+    core.error(`[getLineageData] Error for ${entity}: ${error.message}`);
+    return [];
+  }
 };
+
 const run = async () => {
   try {
     // Initialize summary with basic info
@@ -174,15 +180,15 @@ const run = async () => {
     // Process indirect impacts
     const processIndirectImpacts = async (items) => {
       for (const item of safeArray(items)) {
-        const lineageTables = safeArray(await getLineageData(
+        const lineageTables = await getLineageData(
           item.asset_id,
           item.connection_id,
           item.entity
-        ));
+        );
 
         Everydata.indirect.push(item);
         
-        if (lineageTables.length > 0) {
+        if (lineageTables && lineageTables.length > 0) {
           const downstream = lineageTables
             .filter(table => table?.flow === "downstream")
             .filter(Boolean);
