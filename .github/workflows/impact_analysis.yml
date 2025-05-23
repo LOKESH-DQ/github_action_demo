@@ -39,6 +39,7 @@ jobs:
           changed_files_list: ${{ steps.changes.outputs.all_changed_files }},${{ steps.changes.outputs.deleted_files }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           dqlabs_base_url: ${{ secrets.DQLABS_BASE_URL }}
+          dqlabs_createlink_url: ${{ secrets.DQLABS_CREATELINK_URL }}
 
       - name: Show Summary in Logs
         run: echo "${{ steps.impact-analysis.outputs.impact_markdown }}"

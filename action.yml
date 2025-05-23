@@ -45,6 +45,10 @@ inputs:
     description: "Base URL of the DQLabs API"
     required: true
 
+  dqlabs_createlink_url:
+    description: "URL to create links in DQLabs"
+    required: true
+
 outputs:
   impact_markdown:
     description: "Markdown summary of the impact analysis"
