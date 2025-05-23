@@ -130,13 +130,7 @@ const run = async () => {
 
     // Get tasks safely
     const tasks = await getTasks();
-    if (!tasks || tasks.length === 0) {
-      summary += "No tasks found.\n";
-    } else {
-      summary += `Found ${tasks.length} tasks.\n`;
-    }
-    core.info(`Found ${tasks.length} tasks`);
-
+    
     // Match tasks with changed models
     const matchedTasks = tasks
       .filter(task => task?.connection_type === "dbt")
@@ -145,17 +139,6 @@ const run = async () => {
         ...task,
         entity: task?.task_id || ""
       }));
-
-    for (const task of matchedTasks) {
-      summary += `\n### Matched Task\n`;
-      summary += `- Task: ${task?.name || 'Unknown'}\n`;
-      summary += `  - ID: ${task?.task_id || 'Unknown'}\n`;
-      summary += `  - Connection: ${task?.connection_id || 'Unknown'}\n`;
-      summary += `  - Asset: ${task?.asset_id || 'Unknown'}\n`;
-      summary += `  - Entity: ${task?.entity || 'Unknown'}\n`;
-    }
-
-    core.info(`Matched ${matchedTasks.length} tasks with changed models`);
 
     // Process lineage data
     const Everydata = {
@@ -200,10 +183,33 @@ const run = async () => {
 
     await processIndirectImpacts(Everydata.direct, "first");
 
+    const uniqueKey = (item) => `${item?.name}-${item?.connection_id}`;
+
+    // Create a Set of keys from direct items
+    const directKeys = new Set(Everydata.direct.map(uniqueKey));
+
+    // Filter indirect items to remove those already in direct
+    Everydata.indirect = Everydata.indirect.filter(
+      item => !directKeys.has(uniqueKey(item))
+    );
+
+    // Optional: Remove duplicates within direct and indirect themselves
+    const dedup = (arr) => {
+      const seen = new Set();
+      return arr.filter(item => {
+        const key = uniqueKey(item);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    };
+
+    Everydata.direct = dedup(Everydata.direct);
+    Everydata.indirect = dedup(Everydata.indirect);
+
     // Build summary
     const totalImpacted = Everydata.direct.length + Everydata.indirect.length;
     summary += `**Total Potential Impact:** ${totalImpacted} downstream items\n`;
-    summary += `**Changed Models:** ${changedModels.length}\n\n`;
 
     summary += `### Directly Impacted (${Everydata.direct.length})\n`;
     Everydata.direct.forEach(model => {
