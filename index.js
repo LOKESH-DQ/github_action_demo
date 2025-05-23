@@ -174,7 +174,7 @@ const run = async () => {
         .filter(table => table?.flow === "downstream")
         .filter(Boolean);
 
-      Everydata[task].direct.push(...lineageData);
+      Everydata.direct.push(...lineageData);
     }
 
     // Process indirect impacts
