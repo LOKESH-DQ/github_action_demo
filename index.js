@@ -239,20 +239,30 @@ const run = async () => {
     };
 
     // Build summary
-    const totalImpacted = Everydata.direct.length + Everydata.indirect.length;
-    summary += `**Total Potential Impact:** ${totalImpacted} downstream items\n`;
+    // Helper function to create collapsible sections when needed
+    const buildImpactSection = (directItems, indirectItems) => {
+      const totalImpacts = directItems.length + indirectItems.length;
+      const shouldCollapse = totalImpacts > 20;
+      
+      let content = `## Directly Impacted (${directItems.length})\n`;
+      directItems.forEach(model => {
+        const url = constructItemUrl(model, dqlabs_createlink_url);
+        content += `- [${model?.name || 'Unknown'}](${url})\n`;
+      });
 
-    summary += `### Directly Impacted (${Everydata.direct.length})\n`;
-    Everydata.direct.forEach(model => {
-      const url = constructItemUrl(model, dqlabs_createlink_url);
-      summary += `- <a href="${url}" style="text-decoration: none">${model?.name || 'Unknown'}</a>\n`;
-    });
+      content += `\n## Indirectly Impacted (${indirectItems.length})\n`;
+      indirectItems.forEach(model => {
+        const url = constructItemUrl(model, dqlabs_createlink_url);
+        content += `- [${model?.name || 'Unknown'}](${url})\n`;
+      });
 
-    summary += `\n### Indirectly Impacted (${Everydata.indirect.length})\n`;
-    Everydata.indirect.forEach(model => {
-      const url = constructItemUrl(model, dqlabs_createlink_url);
-      summary += `- <a href="${url}" style="text-decoration: none">${model?.name || 'Unknown'}</a>\n`;
-    });
+      return shouldCollapse
+        ? `<details>\n<summary><b>Impact Analysis (${totalImpacts} items) - Click to expand</b></summary>\n\n${content}\n</details>`
+        : content;
+    };
+
+    // In your summary generation:
+    summary += buildImpactSection(Everydata.direct, Everydata.indirect);
     // Process column changes
     const processColumnChanges = async (extension, extractor) => {
       const changes = [];
