@@ -183,7 +183,7 @@ const run = async () => {
 
     await processIndirectImpacts(Everydata.direct, "first");
 
-    const uniqueKey = (item) => `${item?.name}-${item?.connection_id}`;
+    const uniqueKey = (item) => `${item?.name}-${item?.connection_id}-${item?.asset_name}`;
 
     // Create a Set of keys from direct items
     const directKeys = new Set(Everydata.direct.map(uniqueKey));
