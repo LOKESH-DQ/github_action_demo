@@ -18,6 +18,7 @@ const clientSecret = core.getInput("api_client_secret") || "";
 const changedFilesList = core.getInput("changed_files_list") || "";
 const githubToken = core.getInput("GITHUB_TOKEN") || "";
 const dqlabs_base_url = core.getInput("dqlabs_base_url") || "";
+const dqlabs_createlink_url = core.getInput("dqlabs_createlink_url") || "";
 
 // Safe array processing utility
 const safeArray = (maybeArray) => Array.isArray(maybeArray) ? maybeArray : [];
@@ -207,20 +208,51 @@ const run = async () => {
     Everydata.direct = dedup(Everydata.direct);
     Everydata.indirect = dedup(Everydata.indirect);
 
+    const constructItemUrl = (item, baseUrl) => {
+      if (!item || !baseUrl) return "#";
+      
+      try {
+        const url = new URL(baseUrl);
+        
+        // Handle pipeline items
+        if (item.asset_group === "pipeline") {
+          if (item.is_transform) {
+            url.pathname = `/observe/pipeline/transformation/${item.redirect_id}/run`;
+          } else {
+            url.pathname = `/observe/pipeline/task/${item.redirect_id}/run`;
+          }
+          return url.toString();
+        }
+        
+        // Handle data items
+        if (item.asset_group === "data") {
+          url.pathname = `/observe/data/${item.redirect_id}/measures`;
+          return url.toString();
+        }
+        
+        // Default case
+        return "#";
+      } catch (error) {
+        core.error(`Error constructing URL for ${item.name}: ${error.message}`);
+        return "#";
+      }
+    };
+
     // Build summary
     const totalImpacted = Everydata.direct.length + Everydata.indirect.length;
     summary += `**Total Potential Impact:** ${totalImpacted} downstream items\n`;
 
     summary += `### Directly Impacted (${Everydata.direct.length})\n`;
     Everydata.direct.forEach(model => {
-      summary += `- ${model?.name || 'Unknown'}\n`;
+      const url = constructItemUrl(model, dqlabs_createlink_url);
+      summary += `- [${model?.name || 'Unknown'}](${url})\n`;
     });
 
     summary += `\n### Indirectly Impacted (${Everydata.indirect.length})\n`;
     Everydata.indirect.forEach(model => {
-      summary += `- ${model?.name || 'Unknown'}\n`;
+      const url = constructItemUrl(model, dqlabs_createlink_url);
+      summary += `- [${model?.name || 'Unknown'}](${url})\n`;
     });
-
     // Process column changes
     const processColumnChanges = async (extension, extractor) => {
       const changes = [];
