@@ -242,7 +242,7 @@ const run = async () => {
     // Helper function to create collapsible sections when needed
     const buildImpactSection = (directItems, indirectItems) => {
       const totalImpacts = directItems.length + indirectItems.length;
-      const shouldCollapse = totalImpacts > 20;
+      const shouldCollapse = totalImpacts < 20;
       
       let content = `## Directly Impacted (${directItems.length})\n`;
       directItems.forEach(model => {
