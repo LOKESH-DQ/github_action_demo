@@ -158,17 +158,11 @@ const run = async () => {
     core.info(`Matched ${matchedTasks.length} tasks with changed models`);
 
     // Process lineage data
-    const Everydata = new Map();
+    const Everydata = {
+      direct: [],
+      indirect: []
+    };
 
-// Initialize data structure for each task
-    for (const task of matchedTasks) {
-      Everydata.set(task, {
-        direct: [],
-        indirect: []
-      });
-    }
-
-    // Process direct lineage for each task
     for (const task of matchedTasks) {
       const lineageTables = await getLineageData(
         task.asset_id,
@@ -176,111 +170,51 @@ const run = async () => {
         task.entity
       );
 
-      const lineageData = safeArray(lineageTables)
+      const lineageData = lineageTables
         .filter(table => table?.flow === "downstream")
         .filter(Boolean);
 
-      // Store direct impacts for this specific task
-      const taskData = Everydata.get(task);
-      taskData.direct.push(...lineageData);
+      Everydata[task].direct.push(...lineageData);
     }
 
     // Process indirect impacts
-    const processIndirectImpacts = async (items, task, isFirstLevel = true) => {
+    const processIndirectImpacts = async (items, x) => {
       for (const item of safeArray(items)) {
+        if (x === "second" ) {
+          Everydata.indirect.push(item);
+        }
         const lineageTables = await getLineageData(
           item.asset_id,
           item.connection_id,
           item.entity
         );
-
-        // Only add to indirect if it's not the first level (direct impacts)
-        if (!isFirstLevel) {
-          const taskData = Everydata.get(task);
-          taskData.indirect.push(item);
-        }
-
+        
         if (lineageTables && lineageTables.length > 0) {
-          const downstream = safeArray(lineageTables)
+          const downstream = lineageTables
             .filter(table => table?.flow === "downstream")
             .filter(Boolean);
-          await processIndirectImpacts(downstream, task, false);
+          await processIndirectImpacts(downstream, "second");
         }
       }
     };
 
-    // Process indirect impacts for each task's direct impacts
-    for (const task of matchedTasks) {
-      const taskData = Everydata.get(task);
-      await processIndirectImpacts(taskData.direct, task, true);
-    }
-    // Build summary
-    // Build summary
-    let totalDirect = 0;
-    let totalIndirect = 0;
+    await processIndirectImpacts(Everydata.direct, "first");
 
-    // First count totals across all tasks
-    for (const [task, impacts] of Everydata) {
-      totalDirect += impacts.direct.length;
-      totalIndirect += impacts.indirect.length;
-    }
-
-    const totalImpacted = totalDirect + totalIndirect;
+    // Build summary
+    const totalImpacted = Everydata.direct.length + Everydata.indirect.length;
     summary += `**Total Potential Impact:** ${totalImpacted} downstream items\n`;
     summary += `**Changed Models:** ${changedModels.length}\n\n`;
 
-    // Show impacts per task
-    for (const [task, impacts] of Everydata) {
-      summary += `## Impacts for Task: ${task.name || 'Unknown'}\n`;
-      
-      summary += `### Directly Impacted (${impacts.direct.length})\n`;
-      if (impacts.direct.length > 0) {
-        impacts.direct.forEach(model => {
-          summary += `- ${model?.name || 'Unknown'}\n`;
-        });
-      } else {
-        summary += `No direct impacts found\n`;
-      }
-
-      summary += `\n### Indirectly Impacted (${impacts.indirect.length})\n`;
-      if (impacts.indirect.length > 0) {
-        impacts.indirect.forEach(model => {
-          summary += `- ${model?.name || 'Unknown'}\n`;
-        });
-      } else {
-        summary += `No indirect impacts found\n`;
-      }
-      
-      summary += `\n`;
-    }
-
-    // Optional: Show combined view as well
-    summary += `## Combined Impact Summary\n`;
-    summary += `**Total Direct Impacts:** ${totalDirect}\n`;
-    summary += `**Total Indirect Impacts:** ${totalIndirect}\n\n`;
-
-    // Combined direct impacts
-    const allDirect = [];
-    const allIndirect = [];
-
-    for (const [_, impacts] of Everydata) {
-      allDirect.push(...impacts.direct);
-      allIndirect.push(...impacts.indirect);
-    }
-
-    // Remove duplicates if needed
-    const uniqueDirect = [...new Map(allDirect.map(item => [item.name, item])).values()];
-    const uniqueIndirect = [...new Map(allIndirect.map(item => [item.name, item])).values()];
-
-    summary += `### Unique Directly Impacted Models (${uniqueDirect.length})\n`;
-    uniqueDirect.forEach(model => {
+    summary += `### Directly Impacted (${Everydata.direct.length})\n`;
+    Everydata.direct.forEach(model => {
       summary += `- ${model?.name || 'Unknown'}\n`;
     });
 
-    summary += `\n### Unique Indirectly Impacted Models (${uniqueIndirect.length})\n`;
-    uniqueIndirect.forEach(model => {
+    summary += `\n### Indirectly Impacted (${Everydata.indirect.length})\n`;
+    Everydata.indirect.forEach(model => {
       summary += `- ${model?.name || 'Unknown'}\n`;
     });
+
     // Process column changes
     const processColumnChanges = async (extension, extractor) => {
       const changes = [];
