@@ -245,13 +245,13 @@ const run = async () => {
     summary += `### Directly Impacted (${Everydata.direct.length})\n`;
     Everydata.direct.forEach(model => {
       const url = constructItemUrl(model, dqlabs_createlink_url);
-      summary += `- [${model?.name || 'Unknown'}](${url})\n`;
+      summary += `- <a href="${url}" style="text-decoration: none">${model?.name || 'Unknown'}</a>\n`;
     });
 
     summary += `\n### Indirectly Impacted (${Everydata.indirect.length})\n`;
     Everydata.indirect.forEach(model => {
       const url = constructItemUrl(model, dqlabs_createlink_url);
-      summary += `- [${model?.name || 'Unknown'}](${url})\n`;
+      summary += `- <a href="${url}" style="text-decoration: none">${model?.name || 'Unknown'}</a>\n`;
     });
     // Process column changes
     const processColumnChanges = async (extension, extractor) => {
