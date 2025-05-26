@@ -161,28 +161,6 @@ const run = async () => {
       Everydata.direct.push(...lineageData);
     }
 
-    // Process indirect impacts
-    const processIndirectImpacts = async (items, x) => {
-      for (const item of safeArray(items)) {
-        if (x === "second" ) {
-          Everydata.indirect.push(item);
-        }
-        const lineageTables = await getLineageData(
-          item.asset_id,
-          item.connection_id,
-          item.entity
-        );
-        
-        if (lineageTables && lineageTables.length > 0) {
-          const downstream = lineageTables
-            .filter(table => table?.flow === "downstream")
-            .filter(Boolean);
-          await processIndirectImpacts(downstream, "second");
-        }
-      }
-    };
-
-    await processIndirectImpacts(Everydata.direct, "first");
 
     const uniqueKey = (item) => `${item?.name}-${item?.connection_id}-${item?.asset_name}`;
 
