@@ -29,49 +29,26 @@ function extractColumnsFromYML(content, filePath) {
     const schema = yaml.load(content);
     if (!schema) return [];
 
-    const modelName = path.basename(filePath, '.yml');
-
-    // Case 1: Custom format with model.attributes
-    if (schema.model?.name === modelName && schema.model.attributes) {
-      return Object.entries(schema.model.attributes).map(([name, def]) => ({
-        name,
-        ...(typeof def === 'object' ? def : {})
-      }));
-    }
-
-    // Case 2: Custom format with model.columns
-    if (schema.model?.name === modelName && schema.model.columns) {
-      return schema.model.columns.map(col =>
-        typeof col === 'string' ? { name: col } : col
-      );
-    }
-
-    // Case 3: Standard DBT format with models: [...]
+    // Case 1: Standard DBT format (models array)
     if (Array.isArray(schema.models)) {
-      const model = schema.models.find(m => m.name === modelName);
-      return model?.columns?.map(col =>
-        typeof col === 'string' ? { name: col } : col
-      ) || [];
+      // Extract ALL columns from ALL models (if multiple exist)
+      return schema.models.flatMap(model => 
+        model.columns?.map(col => 
+          typeof col === 'string' ? { name: col } : col
+        ) || []
+      );
     }
 
-    // Case 4: Older DBT format: top-level array
-    if (Array.isArray(schema)) {
-      const model = schema.find(m => m.name === modelName);
-      return model?.columns?.map(col =>
-        typeof col === 'string' ? { name: col } : col
-      ) || [];
-    }
-
-    // Case 5: Flat structure
+    // Case 2: Direct columns definition (fallback)
     if (schema.columns) {
-      return schema.columns.map(col =>
+      return schema.columns.map(col => 
         typeof col === 'string' ? { name: col } : col
       );
     }
 
-    return [];
+    return []; // No columns found
   } catch (e) {
-    console.error(`YML parsing error (${path.basename(filePath)}):`, e.message);
+    console.error(`YML parsing error:`, e);
     return [];
   }
 }
