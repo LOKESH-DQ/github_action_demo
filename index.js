@@ -242,7 +242,7 @@ const run = async () => {
     // In your summary generation:
     summary += buildImpactSection(Everydata.direct, Everydata.indirect);
     // Process column changes
-    const processColumnChanges = async (extension, extractor) => {
+    const processColumnChanges = async (extension, extractor, isYml = false) => {
       const changes = [];
       let added = [];
       let removed = [];
@@ -256,16 +256,40 @@ const run = async () => {
           const headContent = await getFileContent(headSha, file);
           if (!headContent) continue;
 
-          const baseCols = safeArray(baseContent ? extractor(baseContent) : []);
-          const headCols = safeArray(extractor(headContent));
+          const baseCols = safeArray(baseContent ? extractor(baseContent, file) : []);
+          const headCols = safeArray(extractor(headContent, file));
 
-          const addedCols = headCols.filter(col => !baseCols.includes(col));
-          const removedCols = baseCols.filter(col => !headCols.includes(col));
+          // Handle YML columns differently
+          if (isYml) {
+            // Extract just the names for comparison
+            const baseColNames = baseCols.map(col => col.name);
+            const headColNames = headCols.map(col => col.name);
 
-          if (addedCols.length > 0 || removedCols.length > 0) {
-            changes.push({ file, added: addedCols, removed: removedCols });
+            const addedCols = headCols.filter(col => !baseColNames.includes(col.name));
+            const removedCols = baseCols.filter(col => !headColNames.includes(col.name));
+
+            // Get full column info for added/removed
             added.push(...addedCols);
             removed.push(...removedCols);
+
+            if (addedCols.length > 0 || removedCols.length > 0) {
+              changes.push({ 
+                file, 
+                added: addedCols.map(c => c.name),
+                removed: removedCols.map(c => c.name)
+              });
+            }
+          } else {
+            // Original SQL comparison logic
+            const addedCols = headCols.filter(col => !baseCols.includes(col));
+            const removedCols = baseCols.filter(col => !headCols.includes(col));
+
+            added.push(...addedCols);
+            removed.push(...removedCols);
+
+            if (addedCols.length > 0 || removedCols.length > 0) {
+              changes.push({ file, added: addedCols, removed: removedCols });
+            }
           }
         } catch (error) {
           core.error(`Error processing ${file}: ${error.message}`);
@@ -274,7 +298,6 @@ const run = async () => {
 
       return { changes, added, removed };
     };
-
     // Process SQL changes
     const { added: sqlAdded, removed: sqlRemoved } = await processColumnChanges(".sql", extractColumnsFromSQL);
     summary += `\n### SQL Column Changes\n`;
@@ -282,7 +305,7 @@ const run = async () => {
     summary += `Removed: ${sqlRemoved.length} columns\n`;
 
     // Process YML changes
-    const { added: ymlAdded, removed: ymlRemoved } = await processColumnChanges(".yml", extractColumnsFromYML);
+    const { added: ymlAdded, removed: ymlRemoved } = await processColumnChanges(".yml", (content, file) => extractColumnsFromYML(content, file), true);
     summary += `\n### YML Column Changes\n`;
     summary += `Added: ${ymlAdded.length} columns\n`;
     summary += `Removed: ${ymlRemoved.length} columns\n`;
