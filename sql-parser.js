@@ -76,37 +76,6 @@ function extractColumnsFromYML(content, filePath) {
   }
 }
 
-function compareColumns(baseCols, headCols) {
-  const baseMap = new Map(baseCols.map(col => [col.name, col]));
-  const headMap = new Map(headCols.map(col => [col.name, col]));
-
-  const added = [];
-  const removed = [];
-  const modified = [];
-
-  for (const [name, headCol] of headMap.entries()) {
-    if (!baseMap.has(name)) {
-      added.push(headCol);
-    } else {
-      const baseCol = baseMap.get(name);
-      const baseClean = JSON.stringify({ ...baseCol });
-      const headClean = JSON.stringify({ ...headCol });
-
-      if (baseClean !== headClean) {
-        modified.push({ name, before: baseCol, after: headCol });
-      }
-    }
-  }
-
-  for (const [name, baseCol] of baseMap.entries()) {
-    if (!headMap.has(name)) {
-      removed.push(baseCol);
-    }
-  }
-
-  return { added, removed, modified };
-}
-
 // Enhanced Git Helper with better error handling
 function getFileContent(sha, filePath) {
   try {
@@ -128,6 +97,5 @@ function getFileContent(sha, filePath) {
 module.exports = {
   extractColumnsFromSQL,
   extractColumnsFromYML,
-  getFileContent,
-  compareColumns
+  getFileContent
 };

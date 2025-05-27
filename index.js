@@ -9,8 +9,7 @@ const yaml = require("js-yaml");
 const { 
   extractColumnsFromSQL = () => [], 
   getFileContent = () => null, 
-  extractColumnsFromYML = () => [], 
-  compareColumns = () => ({ added: [], removed: [], modified: [] })
+  extractColumnsFromYML = () => [] 
 } = require("./sql-parser") || {};
 
 // Get inputs with defaults
@@ -247,7 +246,6 @@ const run = async () => {
       const changes = [];
       let added = [];
       let removed = [];
-      let modified = [];
 
       for (const file of changedFiles.filter(f => f && f.endsWith(extension))) {
         try {
@@ -258,39 +256,35 @@ const run = async () => {
           const headContent = await getFileContent(headSha, file);
           if (!headContent) continue;
 
-          const baseCols = safeArray(baseContent ? extractor(baseContent, file) : []);
-          const headCols = safeArray(extractor(headContent, file));
+          const baseCols = safeArray(baseContent ? extractor(baseContent) : []);
+          const headCols = safeArray(extractor(headContent));
 
-          // Use compareColumns function that returns {added, removed, modified}
-          const { added: addedCols, removed: removedCols, modified: modifiedCols } = compareColumns(baseCols, headCols);
+          const addedCols = headCols.filter(col => !baseCols.includes(col));
+          const removedCols = baseCols.filter(col => !headCols.includes(col));
 
-          if (addedCols.length > 0 || removedCols.length > 0 || modifiedCols.length > 0) {
-            changes.push({ file, added: addedCols, removed: removedCols, modified: modifiedCols });
+          if (addedCols.length > 0 || removedCols.length > 0) {
+            changes.push({ file, added: addedCols, removed: removedCols });
             added.push(...addedCols);
             removed.push(...removedCols);
-            modified.push(...modifiedCols);
           }
         } catch (error) {
           core.error(`Error processing ${file}: ${error.message}`);
         }
       }
 
-      return { changes, added, removed, modified };
+      return { changes, added, removed };
     };
 
-
     // Process SQL changes
-    const { added: sqlAdded, removed: sqlRemoved, modified: sqlModified } = await processColumnChanges(".sql", extractColumnsFromSQL);
+    const { added: sqlAdded, removed: sqlRemoved } = await processColumnChanges(".sql", extractColumnsFromSQL);
     summary += `\n### SQL Column Changes\n`;
     summary += `Added: ${sqlAdded.length} columns\n`;
-    summary += `Modified: ${sqlModified.length} columns\n`;
     summary += `Removed: ${sqlRemoved.length} columns\n`;
 
     // Process YML changes
-    const { added: ymlAdded, removed: ymlRemoved, modified: ymlModified } = await processColumnChanges(".yml", extractColumnsFromYML);
+    const { added: ymlAdded, removed: ymlRemoved } = await processColumnChanges(".yml", extractColumnsFromYML);
     summary += `\n### YML Column Changes\n`;
     summary += `Added: ${ymlAdded.length} columns\n`;
-    summary += `Modified: ${ymlModified.length} columns\n`;
     summary += `Removed: ${ymlRemoved.length} columns\n`;
 
     // Post comment

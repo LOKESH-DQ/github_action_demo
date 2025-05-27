@@ -1,0 +1,25 @@
+models:
+  - name: product_sales_vw
+    tags: ["production", "analytics"]  # Corrected tag placement
+    description: "A view showing product sales data"
+    columns:
+      - name: PRODUCTID
+        description: "The unique identifier for the product"
+        tests:
+          - not_null
+          # - unique
+ 
+  - name: employee_sales_vw
+    tags: ["production", "analytics"]  # Corrected tag placement
+    description: "A view showing employee sales data"
+     columns:
+      - name: CURRENCY
+        description: "The unique identifier for the product"
+        tests:
+          - not_null
+          # - unique
+      - name: EMPLOYEEID
+        description: "The unique identifier for the employee"
+        tests:
+          - not_null
+          # - unique
