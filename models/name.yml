@@ -9,5 +9,5 @@ model:
       type: string
     createdAt:
       type: date
-    updatedAt:
+    modifiedAt:
       type: date
