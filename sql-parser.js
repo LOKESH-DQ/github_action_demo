@@ -29,19 +29,44 @@ function extractColumnsFromYML(content, filePath) {
     const schema = yaml.load(content);
     if (!schema) return [];
 
-    // Handle your specific format (model.attributes)
-    if (schema.model?.attributes) {
-      return Object.keys(schema.model.attributes);
+    const modelName = path.basename(filePath, '.yml');
+
+    // Case 1: Custom format with model.attributes
+    if (schema.model?.name === modelName && schema.model.attributes) {
+      return Object.entries(schema.model.attributes).map(([name, def]) => ({
+        name,
+        ...(typeof def === 'object' ? def : {})
+      }));
     }
-    // Handle standard DBT schema format (backward compatibility)
-    else if (Array.isArray(schema)) {
-      const modelName = path.basename(filePath, '.yml');
+
+    // Case 2: Custom format with model.columns
+    if (schema.model?.name === modelName && schema.model.columns) {
+      return schema.model.columns.map(col =>
+        typeof col === 'string' ? { name: col } : col
+      );
+    }
+
+    // Case 3: Standard DBT format with models: [...]
+    if (Array.isArray(schema.models)) {
+      const model = schema.models.find(m => m.name === modelName);
+      return model?.columns?.map(col =>
+        typeof col === 'string' ? { name: col } : col
+      ) || [];
+    }
+
+    // Case 4: Older DBT format: top-level array
+    if (Array.isArray(schema)) {
       const model = schema.find(m => m.name === modelName);
-      return model?.columns?.map(col => col.name || col) || [];
+      return model?.columns?.map(col =>
+        typeof col === 'string' ? { name: col } : col
+      ) || [];
     }
-    // Handle direct columns definition
-    else if (schema.columns) {
-      return schema.columns.map(col => col.name || col);
+
+    // Case 5: Flat structure
+    if (schema.columns) {
+      return schema.columns.map(col =>
+        typeof col === 'string' ? { name: col } : col
+      );
     }
 
     return [];
@@ -49,6 +74,37 @@ function extractColumnsFromYML(content, filePath) {
     console.error(`YML parsing error (${path.basename(filePath)}):`, e.message);
     return [];
   }
+}
+
+function compareColumns(baseCols, headCols) {
+  const baseMap = new Map(baseCols.map(col => [col.name, col]));
+  const headMap = new Map(headCols.map(col => [col.name, col]));
+
+  const added = [];
+  const removed = [];
+  const modified = [];
+
+  for (const [name, headCol] of headMap.entries()) {
+    if (!baseMap.has(name)) {
+      added.push(headCol);
+    } else {
+      const baseCol = baseMap.get(name);
+      const baseClean = JSON.stringify({ ...baseCol });
+      const headClean = JSON.stringify({ ...headCol });
+
+      if (baseClean !== headClean) {
+        modified.push({ name, before: baseCol, after: headCol });
+      }
+    }
+  }
+
+  for (const [name, baseCol] of baseMap.entries()) {
+    if (!headMap.has(name)) {
+      removed.push(baseCol);
+    }
+  }
+
+  return { added, removed, modified };
 }
 
 // Enhanced Git Helper with better error handling
@@ -72,5 +128,6 @@ function getFileContent(sha, filePath) {
 module.exports = {
   extractColumnsFromSQL,
   extractColumnsFromYML,
-  getFileContent
+  getFileContent,
+  compareColumns
 };
