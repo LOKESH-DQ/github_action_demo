@@ -301,14 +301,14 @@ const run = async () => {
     // Process SQL changes
     const { added: sqlAdded, removed: sqlRemoved } = await processColumnChanges(".sql", extractColumnsFromSQL);
     summary += `\n### SQL Column Changes\n`;
-    summary += `Added columns(${sqlAdded.length}): ${sqlAdded}\n`;
-    summary += `Removed columns(${sqlRemoved.length}): ${sqlRemoved} \n`;
+    summary += `Added columns(${sqlAdded.length}): ${sqlAdded.join(', ')}\n`;
+    summary += `Removed columns(${sqlRemoved.length}): ${sqlRemoved.join(', ')}\n`;
 
     // Process YML changes
     const { added: ymlAdded, removed: ymlRemoved } = await processColumnChanges(".yml", (content, file) => extractColumnsFromYML(content, file), true);
     summary += `\n### YML Column Changes\n`;
-    summary += `Added columns(${ymlAdded.length}): ${ymlAdded}\n`;
-    summary += `Removed columns(${ymlRemoved.length}): ${ymlRemoved} \n`;
+    summary += `Added columns(${ymlAdded.length}): ${ymlAdded.map(c => c.name).join(', ')}\n`;
+    summary += `Removed columns(${ymlRemoved.length}): ${ymlRemoved.map(c => c.name).join(', ')}\n`;
     // Post comment
     if (github.context.payload.pull_request) {
       try {
