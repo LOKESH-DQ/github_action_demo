@@ -18,7 +18,7 @@ models:
         tests:
           - not_null
           # - unique
-      - name: EMPLOYEEID
+      - name: EMPLOYEEID1234
         description: "The unique identifier for the employee"
         tests:
           - not_null
