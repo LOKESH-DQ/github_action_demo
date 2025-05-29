@@ -86,17 +86,50 @@ const getTasks = async () => {
   }
 };
 
-const getLineageData = async (asset_id, connection_id, entity) => {
-  try {
-    const lineageUrl = `${dqlabs_base_url}/api/lineage/entities/linked/`;
-    const payload = {
-      asset_id,
-      connection_id,
-      entity,
-    };
+// const getLineageData = async (asset_id, connection_id, entity) => {
+//   try {
+//     const lineageUrl = `${dqlabs_base_url}/api/lineage/entities/linked/`;
+//     const payload = {
+//       asset_id,
+//       connection_id,
+//       entity,
+//     };
  
+//     const response = await axios.post(
+//       lineageUrl,
+//       payload,
+//       {
+//         headers: {
+//           "Content-Type": "application/json",
+//           "client-id": clientId,
+//           "client-secret": clientSecret,
+//         },
+//       }
+//     );
+ 
+//     return safeArray(response?.data?.response?.data);
+//   } catch (error) {
+//     core.error(`[getLineageData] Error for ${entity}: ${error.message}`);
+//     return [];
+//   }
+// };
+
+const getImpactAnalysisData = async (asset_id, connection_id, entity, isDirect = true) => {
+  try {
+    const impactAnalysisUrl = `${dqlabs_base_url}/api/lineage/impact-analysis/`;
+    const payload = {
+      connection_id,
+      asset_id,
+      entity,
+      moreOptions: {
+        view_by: "table",
+        ...(!isDirect && { depth: 10 }) // Add depth only for indirect impact
+      },
+      search_key: ""
+    };
+
     const response = await axios.post(
-      lineageUrl,
+      impactAnalysisUrl,
       payload,
       {
         headers: {
@@ -106,10 +139,10 @@ const getLineageData = async (asset_id, connection_id, entity) => {
         },
       }
     );
- 
+
     return safeArray(response?.data?.response?.data);
   } catch (error) {
-    core.error(`[getLineageData] Error for ${entity}: ${error.message}`);
+    core.error(`[getImpactAnalysisData] Error for ${entity}: ${error.message}`);
     return [];
   }
 };
@@ -142,37 +175,51 @@ const run = async () => {
       }));
 
     // Process lineage data
+    // Process impact data
     const Everydata = {
       direct: [],
       indirect: []
     };
 
+    // Get direct impacts (without depth)
     for (const task of matchedTasks) {
-      const lineageTables = await getLineageData(
+      const directImpact = await getImpactAnalysisData(
         task.asset_id,
         task.connection_id,
-        task.entity
+        task.entity,
+        true // isDirect = true
       );
 
-      const lineageData = lineageTables
-        .filter(table => table?.flow === "downstream")
+      // Filter out the task itself from direct impacts
+      const filteredDirectImpact = directImpact
+        .filter(table => table?.name !== task.name)
         .filter(Boolean);
 
-      Everydata.direct.push(...lineageData);
+      Everydata.direct.push(...filteredDirectImpact);
     }
 
+    // Get indirect impacts (with depth=10)
+    for (const task of matchedTasks) {
+      const indirectImpact = await getImpactAnalysisData(
+        task.asset_id,
+        task.connection_id,
+        task.entity,
+        false // isDirect = false
+      );
 
+      Everydata.indirect.push(...indirectImpact);
+    }
+
+    // Create unique key function for comparison
     const uniqueKey = (item) => `${item?.name}-${item?.connection_id}-${item?.asset_name}`;
 
-    // Create a Set of keys from direct items
+    // Remove direct impacts from indirect results
     const directKeys = new Set(Everydata.direct.map(uniqueKey));
-
-    // Filter indirect items to remove those already in direct
     Everydata.indirect = Everydata.indirect.filter(
       item => !directKeys.has(uniqueKey(item))
     );
 
-    // Optional: Remove duplicates within direct and indirect themselves
+    // Deduplicate results
     const dedup = (arr) => {
       const seen = new Set();
       return arr.filter(item => {
