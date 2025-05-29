@@ -140,7 +140,7 @@ const getImpactAnalysisData = async (asset_id, connection_id, entity, isDirect =
       }
     );
 
-    return safeArray(response?.data?.response?.data);
+    return safeArray(response?.data?.response?.data?.tables || []);
   } catch (error) {
     core.error(`[getImpactAnalysisData] Error for ${entity}: ${error.message}`);
     return [];
