@@ -24,8 +24,7 @@ o.CUSTOMER_ID = c.CUSTOMER_ID
 )
 
 SELECT
-new_column,
-CUSTOMER_ID,
+new_column1,
 ORDER_DATE,
 STATUS,
 FIRST_NAME,
