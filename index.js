@@ -150,6 +150,10 @@ const run = async () => {
   try {
     let summary = "## Impact Analysis Report\n\n";
     const changedFiles = safeArray(await getChangedFiles());
+    summary += "\n ## Changed Files\n";
+    changedFiles.forEach(file => {
+      summary += `- ${file}\n`;
+    });
     core.info(`Found ${changedFiles.length} changed files`);
     
     const changedModels = changedFiles
@@ -253,8 +257,6 @@ const run = async () => {
     if (shouldCollapse) {
       summary += `</details>\n\n`;
     }
-
-    summary += `\nChanged files: ${changedFiles.join(', ')}\n`;
 
     // Process column changes
     const processColumnChanges = async (extension, extractor, isYml = false) => {
