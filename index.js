@@ -95,7 +95,7 @@ const getImpactAnalysisData = async (asset_id, connection_id, entity, isDirect =
       entity,
       moreOptions: {
         view_by: "table",
-        ...(!isDirect && { depth: 10 }) // Add depth only for indirect impact
+        ...(!isDirect && { depth: 10 })
       },
       search_key: ""
     };
@@ -125,7 +125,6 @@ const constructItemUrl = (item, baseUrl) => {
   try {
     const url = new URL(baseUrl);
     
-    // Handle pipeline items
     if (item.asset_group === "pipeline") {
       if (item.is_transform) {
         url.pathname = `/observe/pipeline/transformation/${item.redirect_id}/run`;
@@ -135,13 +134,11 @@ const constructItemUrl = (item, baseUrl) => {
       return url.toString();
     }
     
-    // Handle data items
     if (item.asset_group === "data") {
       url.pathname = `/observe/data/${item.redirect_id}/measures`;
       return url.toString();
     }
     
-    // Default case
     return "#";
   } catch (error) {
     core.error(`Error constructing URL for ${item.name}: ${error.message}`);
@@ -151,23 +148,17 @@ const constructItemUrl = (item, baseUrl) => {
 
 const run = async () => {
   try {
-    // Initialize summary with basic info
     let summary = "## Impact Analysis Report\n\n";
-    
-    // Get changed files safely
     const changedFiles = safeArray(await getChangedFiles());
     core.info(`Found ${changedFiles.length} changed files`);
     
-    // Process changed SQL models
     const changedModels = changedFiles
       .filter(file => file && typeof file === "string" && file.endsWith(".sql"))
       .map(file => path.basename(file, path.extname(file)))
       .filter(Boolean);
 
-    // Get tasks safely
     const tasks = await getTasks();
     
-    // Match tasks with changed models
     const matchedTasks = tasks
       .filter(task => task?.connection_type === "dbt")
       .filter(task => changedModels.includes(task?.name))
@@ -177,40 +168,34 @@ const run = async () => {
         modelName: task?.name || ""
       }));
 
-    // Process impact data for each changed file
     const impactsByFile = {};
 
     for (const task of matchedTasks) {
       const fileKey = `${task.modelName}.sql`;
       
-      // Get direct impacts
       const directImpact = await getImpactAnalysisData(
         task.asset_id,
         task.connection_id,
         task.entity,
-        true // isDirect = true
+        true
       );
 
-      // Filter out the task itself from direct impacts
       const filteredDirectImpact = directImpact
         .filter(table => table?.name !== task.modelName)
         .filter(Boolean);
 
-      // Get indirect impacts
       const indirectImpact = await getImpactAnalysisData(
         task.asset_id,
         task.connection_id,
         task.entity,
-        false // isDirect = false
+        false
       );
 
-      // Filter out direct impacts from indirect results
       const directKeys = new Set(filteredDirectImpact.map(item => `${item?.name}-${item?.connection_id}-${item?.asset_name}`));
       const filteredIndirectImpact = indirectImpact.filter(
         item => !directKeys.has(`${item?.name}-${item?.connection_id}-${item?.asset_name}`)
       );
 
-      // Deduplicate results
       const dedup = (arr) => {
         const seen = new Set();
         return arr.filter(item => {
@@ -227,11 +212,21 @@ const run = async () => {
       };
     }
 
-    // Build summary organized by changed file
+    // Calculate total impacts for collapsible section
+    let totalImpacts = 0;
+    for (const [_, impacts] of Object.entries(impactsByFile)) {
+      totalImpacts += impacts.direct.length + impacts.indirect.length;
+    }
+
+    const shouldCollapse = totalImpacts > 20;
+    
+    if (shouldCollapse) {
+      summary += `<details>\n<summary><b>Impact Analysis (${totalImpacts} items) - Click to expand</b></summary>\n\n`;
+    }
+
     for (const [file, impacts] of Object.entries(impactsByFile)) {
       summary += `### ${file}\n`;
       
-      // Direct impacts
       if (impacts.direct.length > 0) {
         summary += `#### Directly Impacted (${impacts.direct.length})\n`;
         impacts.direct.forEach(model => {
@@ -242,7 +237,6 @@ const run = async () => {
         summary += `#### No direct impacts found\n`;
       }
       
-      // Indirect impacts
       if (impacts.indirect.length > 0) {
         summary += `\n#### Indirectly Impacted (${impacts.indirect.length})\n`;
         impacts.indirect.forEach(model => {
@@ -255,7 +249,12 @@ const run = async () => {
       
       summary += `\n`;
     }
-    summary += `\n changedfiles : ${changedFiles.join(', ')}\n`;
+
+    if (shouldCollapse) {
+      summary += `</details>\n\n`;
+    }
+
+    summary += `\nChanged files: ${changedFiles.join(', ')}\n`;
 
     // Process column changes
     const processColumnChanges = async (extension, extractor, isYml = false) => {
@@ -275,16 +274,13 @@ const run = async () => {
           const baseCols = safeArray(baseContent ? extractor(baseContent, file) : []);
           const headCols = safeArray(extractor(headContent, file));
 
-          // Handle YML columns differently
           if (isYml) {
-            // Extract just the names for comparison
             const baseColNames = baseCols.map(col => col.name);
             const headColNames = headCols.map(col => col.name);
 
             const addedCols = headCols.filter(col => !baseColNames.includes(col.name));
             const removedCols = baseCols.filter(col => !headColNames.includes(col.name));
 
-            // Get full column info for added/removed
             added.push(...addedCols);
             removed.push(...removedCols);
 
@@ -296,7 +292,6 @@ const run = async () => {
               });
             }
           } else {
-            // Original SQL comparison logic
             const addedCols = headCols.filter(col => !baseCols.includes(col));
             const removedCols = baseCols.filter(col => !headCols.includes(col));
 
@@ -314,18 +309,17 @@ const run = async () => {
 
       return { changes, added, removed };
     };
-    // Process SQL changes
+
     const { added: sqlAdded, removed: sqlRemoved } = await processColumnChanges(".sql", extractColumnsFromSQL);
     summary += `\n### SQL Column Changes\n`;
     summary += `Added columns(${sqlAdded.length}): ${sqlAdded.join(', ')}\n`;
     summary += `Removed columns(${sqlRemoved.length}): ${sqlRemoved.join(', ')}\n`;
 
-    // Process YML changes
     const { added: ymlAdded, removed: ymlRemoved } = await processColumnChanges(".yml", (content, file) => extractColumnsFromYML(content, file), true);
     summary += `\n### YML Column Changes\n`;
     summary += `Added columns(${ymlAdded.length}): ${ymlAdded.map(c => c.name).join(', ')}\n`;
     summary += `Removed columns(${ymlRemoved.length}): ${ymlRemoved.map(c => c.name).join(', ')}\n`;
-    // Post comment
+
     if (github.context.payload.pull_request) {
       try {
         const octokit = github.getOctokit(githubToken);
@@ -340,7 +334,6 @@ const run = async () => {
       }
     }
 
-    // Output results
     await core.summary
       .addRaw(summary)
       .write();
@@ -352,7 +345,6 @@ const run = async () => {
   }
 };
 
-// Execute
 run().catch(error => {
   core.setFailed(`[UNCAUGHT] Critical failure: ${error.message}`);
 });
