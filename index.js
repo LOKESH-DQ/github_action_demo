@@ -256,11 +256,11 @@ const run = async () => {
       summary += `\n`;
     }
 
-    // Process column changes
+    // Process column changes - UPDATED TO SHOW FILE-SPECIFIC CHANGES
     const processColumnChanges = async (extension, extractor, isYml = false) => {
       const changes = [];
-      let added = [];
-      let removed = [];
+      const added = [];
+      const removed = [];
 
       for (const file of changedFiles.filter(f => f && f.endsWith(extension))) {
         try {
@@ -274,37 +274,32 @@ const run = async () => {
           const baseCols = safeArray(baseContent ? extractor(baseContent, file) : []);
           const headCols = safeArray(extractor(headContent, file));
 
-          // Handle YML columns differently
+          let fileAdded = [];
+          let fileRemoved = [];
+
           if (isYml) {
-            // Extract just the names for comparison
             const baseColNames = baseCols.map(col => col.name);
             const headColNames = headCols.map(col => col.name);
 
-            const addedCols = headCols.filter(col => !baseColNames.includes(col.name));
-            const removedCols = baseCols.filter(col => !headColNames.includes(col.name));
+            fileAdded = headCols.filter(col => !baseColNames.includes(col.name));
+            fileRemoved = baseCols.filter(col => !headColNames.includes(col.name));
 
-            // Get full column info for added/removed
-            added.push(...addedCols);
-            removed.push(...removedCols);
-
-            if (addedCols.length > 0 || removedCols.length > 0) {
-              changes.push({ 
-                file, 
-                added: addedCols.map(c => c.name),
-                removed: removedCols.map(c => c.name)
-              });
-            }
+            added.push(...fileAdded);
+            removed.push(...fileRemoved);
           } else {
-            // Original SQL comparison logic
-            const addedCols = headCols.filter(col => !baseCols.includes(col));
-            const removedCols = baseCols.filter(col => !headCols.includes(col));
+            fileAdded = headCols.filter(col => !baseCols.includes(col));
+            fileRemoved = baseCols.filter(col => !headCols.includes(col));
 
-            added.push(...addedCols);
-            removed.push(...removedCols);
+            added.push(...fileAdded);
+            removed.push(...fileRemoved);
+          }
 
-            if (addedCols.length > 0 || removedCols.length > 0) {
-              changes.push({ file, added: addedCols, removed: removedCols });
-            }
+          if (fileAdded.length > 0 || fileRemoved.length > 0) {
+            changes.push({
+              file,
+              added: isYml ? fileAdded.map(c => c.name) : fileAdded,
+              removed: isYml ? fileRemoved.map(c => c.name) : fileRemoved
+            });
           }
         } catch (error) {
           core.error(`Error processing ${file}: ${error.message}`);
@@ -314,17 +309,41 @@ const run = async () => {
       return { changes, added, removed };
     };
 
-    // Process SQL changes
-    const { added: sqlAdded, removed: sqlRemoved } = await processColumnChanges(".sql", extractColumnsFromSQL);
-    summary += `\n### SQL Column Changes\n`;
-    summary += `Added columns(${sqlAdded.length}): ${sqlAdded.join(', ')}\n`;
-    summary += `Removed columns(${sqlRemoved.length}): ${sqlRemoved.join(', ')}\n`;
+    // Process SQL changes - UPDATED FORMAT
+    const { changes: sqlChanges } = await processColumnChanges(".sql", extractColumnsFromSQL);
+    if (sqlChanges.length > 0) {
+      summary += `### SQL Column Changes\n`;
+      sqlChanges.forEach(change => {
+        summary += `#### ${change.file}\n`;
+        if (change.added.length > 0) {
+          summary += `Added columns(${change.added.length}): ${change.added.join(', ')}\n`;
+        }
+        if (change.removed.length > 0) {
+          summary += `Removed columns(${change.removed.length}): ${change.removed.join(', ')}\n`;
+        }
+        summary += `\n`;
+      });
+    } else {
+      summary += `### No SQL column changes detected\n\n`;
+    }
 
-    // Process YML changes
-    const { added: ymlAdded, removed: ymlRemoved } = await processColumnChanges(".yml", (content, file) => extractColumnsFromYML(content, file), true);
-    summary += `\n### YML Column Changes\n`;
-    summary += `Added columns(${ymlAdded.length}): ${ymlAdded.map(c => c.name).join(', ')}\n`;
-    summary += `Removed columns(${ymlRemoved.length}): ${ymlRemoved.map(c => c.name).join(', ')}\n`;
+    // Process YML changes - UPDATED FORMAT
+    const { changes: ymlChanges } = await processColumnChanges(".yml", (content, file) => extractColumnsFromYML(content, file), true);
+    if (ymlChanges.length > 0) {
+      summary += `### YML Column Changes\n`;
+      ymlChanges.forEach(change => {
+        summary += `#### ${change.file}\n`;
+        if (change.added.length > 0) {
+          summary += `Added columns(${change.added.length}): ${change.added.join(', ')}\n`;
+        }
+        if (change.removed.length > 0) {
+          summary += `Removed columns(${change.removed.length}): ${change.removed.join(', ')}\n`;
+        }
+        summary += `\n`;
+      });
+    } else {
+      summary += `### No YML column changes detected\n\n`;
+    }
 
     // Post comment
     if (github.context.payload.pull_request) {
