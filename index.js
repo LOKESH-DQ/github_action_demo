@@ -255,6 +255,7 @@ const run = async () => {
       
       summary += `\n`;
     }
+    summary += `\n changedfiles : ${changedFiles.join(', ')}\n`;
 
     // Process column changes
     const processColumnChanges = async (extension, extractor, isYml = false) => {
