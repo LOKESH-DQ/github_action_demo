@@ -86,34 +86,6 @@ const getTasks = async () => {
   }
 };
 
-// const getLineageData = async (asset_id, connection_id, entity) => {
-//   try {
-//     const lineageUrl = `${dqlabs_base_url}/api/lineage/entities/linked/`;
-//     const payload = {
-//       asset_id,
-//       connection_id,
-//       entity,
-//     };
- 
-//     const response = await axios.post(
-//       lineageUrl,
-//       payload,
-//       {
-//         headers: {
-//           "Content-Type": "application/json",
-//           "client-id": clientId,
-//           "client-secret": clientSecret,
-//         },
-//       }
-//     );
- 
-//     return safeArray(response?.data?.response?.data);
-//   } catch (error) {
-//     core.error(`[getLineageData] Error for ${entity}: ${error.message}`);
-//     return [];
-//   }
-// };
-
 const getImpactAnalysisData = async (asset_id, connection_id, entity, isDirect = true) => {
   try {
     const impactAnalysisUrl = `${dqlabs_base_url}/api/lineage/impact-analysis/`;
@@ -147,6 +119,36 @@ const getImpactAnalysisData = async (asset_id, connection_id, entity, isDirect =
   }
 };
 
+const constructItemUrl = (item, baseUrl) => {
+  if (!item || !baseUrl) return "#";
+  
+  try {
+    const url = new URL(baseUrl);
+    
+    // Handle pipeline items
+    if (item.asset_group === "pipeline") {
+      if (item.is_transform) {
+        url.pathname = `/observe/pipeline/transformation/${item.redirect_id}/run`;
+      } else {
+        url.pathname = `/observe/pipeline/task/${item.redirect_id}/run`;
+      }
+      return url.toString();
+    }
+    
+    // Handle data items
+    if (item.asset_group === "data") {
+      url.pathname = `/observe/data/${item.redirect_id}/measures`;
+      return url.toString();
+    }
+    
+    // Default case
+    return "#";
+  } catch (error) {
+    core.error(`Error constructing URL for ${item.name}: ${error.message}`);
+    return "#";
+  }
+};
+
 const run = async () => {
   try {
     // Initialize summary with basic info
@@ -171,18 +173,17 @@ const run = async () => {
       .filter(task => changedModels.includes(task?.name))
       .map(task => ({
         ...task,
-        entity: task?.task_id || ""
+        entity: task?.task_id || "",
+        modelName: task?.name || ""
       }));
 
-    // Process lineage data
-    // Process impact data
-    const Everydata = {
-      direct: [],
-      indirect: []
-    };
+    // Process impact data for each changed file
+    const impactsByFile = {};
 
-    // Get direct impacts (without depth)
     for (const task of matchedTasks) {
+      const fileKey = `${task.modelName}.sql`;
+      
+      // Get direct impacts
       const directImpact = await getImpactAnalysisData(
         task.asset_id,
         task.connection_id,
@@ -192,14 +193,10 @@ const run = async () => {
 
       // Filter out the task itself from direct impacts
       const filteredDirectImpact = directImpact
-        .filter(table => table?.name !== task.name)
+        .filter(table => table?.name !== task.modelName)
         .filter(Boolean);
 
-      Everydata.direct.push(...filteredDirectImpact);
-    }
-
-    // Get indirect impacts (with depth=10)
-    for (const task of matchedTasks) {
+      // Get indirect impacts
       const indirectImpact = await getImpactAnalysisData(
         task.asset_id,
         task.connection_id,
@@ -207,87 +204,58 @@ const run = async () => {
         false // isDirect = false
       );
 
-      Everydata.indirect.push(...indirectImpact);
+      // Filter out direct impacts from indirect results
+      const directKeys = new Set(filteredDirectImpact.map(item => `${item?.name}-${item?.connection_id}-${item?.asset_name}`));
+      const filteredIndirectImpact = indirectImpact.filter(
+        item => !directKeys.has(`${item?.name}-${item?.connection_id}-${item?.asset_name}`)
+      );
+
+      // Deduplicate results
+      const dedup = (arr) => {
+        const seen = new Set();
+        return arr.filter(item => {
+          const key = `${item?.name}-${item?.connection_id}-${item?.asset_name}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+      };
+
+      impactsByFile[fileKey] = {
+        direct: dedup(filteredDirectImpact),
+        indirect: dedup(filteredIndirectImpact)
+      };
     }
 
-    // Create unique key function for comparison
-    const uniqueKey = (item) => `${item?.name}-${item?.connection_id}-${item?.asset_name}`;
-
-    // Remove direct impacts from indirect results
-    const directKeys = new Set(Everydata.direct.map(uniqueKey));
-    Everydata.indirect = Everydata.indirect.filter(
-      item => !directKeys.has(uniqueKey(item))
-    );
-
-    // Deduplicate results
-    const dedup = (arr) => {
-      const seen = new Set();
-      return arr.filter(item => {
-        const key = uniqueKey(item);
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      });
-    };
-
-    Everydata.direct = dedup(Everydata.direct);
-    Everydata.indirect = dedup(Everydata.indirect);
-
-    const constructItemUrl = (item, baseUrl) => {
-      if (!item || !baseUrl) return "#";
+    // Build summary organized by changed file
+    for (const [file, impacts] of Object.entries(impactsByFile)) {
+      summary += `### ${file}\n`;
       
-      try {
-        const url = new URL(baseUrl);
-        
-        // Handle pipeline items
-        if (item.asset_group === "pipeline") {
-          if (item.is_transform) {
-            url.pathname = `/observe/pipeline/transformation/${item.redirect_id}/run`;
-          } else {
-            url.pathname = `/observe/pipeline/task/${item.redirect_id}/run`;
-          }
-          return url.toString();
-        }
-        
-        // Handle data items
-        if (item.asset_group === "data") {
-          url.pathname = `/observe/data/${item.redirect_id}/measures`;
-          return url.toString();
-        }
-        
-        // Default case
-        return "#";
-      } catch (error) {
-        core.error(`Error constructing URL for ${item.name}: ${error.message}`);
-        return "#";
+      // Direct impacts
+      if (impacts.direct.length > 0) {
+        summary += `#### Directly Impacted (${impacts.direct.length})\n`;
+        impacts.direct.forEach(model => {
+          const url = constructItemUrl(model, dqlabs_createlink_url);
+          summary += `- [${model?.name || 'Unknown'}](${url})\n`;
+        });
+      } else {
+        summary += `#### No direct impacts found\n`;
       }
-    };
-
-    // Build summary
-    // Helper function to create collapsible sections when needed
-    const buildImpactSection = (directItems, indirectItems) => {
-      const totalImpacts = directItems.length + indirectItems.length;
-      const shouldCollapse = totalImpacts > 20;
       
-      let content = `## Directly Impacted (${directItems.length})\n`;
-      directItems.forEach(model => {
-        const url = constructItemUrl(model, dqlabs_createlink_url);
-        content += `- [${model?.name || 'Unknown'}](${url})\n`;
-      });
+      // Indirect impacts
+      if (impacts.indirect.length > 0) {
+        summary += `\n#### Indirectly Impacted (${impacts.indirect.length})\n`;
+        impacts.indirect.forEach(model => {
+          const url = constructItemUrl(model, dqlabs_createlink_url);
+          summary += `- [${model?.name || 'Unknown'}](${url})\n`;
+        });
+      } else {
+        summary += `\n#### No indirect impacts found\n`;
+      }
+      
+      summary += `\n`;
+    }
 
-      content += `\n## Indirectly Impacted (${indirectItems.length})\n`;
-      indirectItems.forEach(model => {
-        const url = constructItemUrl(model, dqlabs_createlink_url);
-        content += `- [${model?.name || 'Unknown'}](${url})\n`;
-      });
-
-      return shouldCollapse
-        ? `<details>\n<summary><b>Impact Analysis (${totalImpacts} items) - Click to expand</b></summary>\n\n${content}\n</details>`
-        : content;
-    };
-
-    // In your summary generation:
-    summary += buildImpactSection(Everydata.direct, Everydata.indirect);
     // Process column changes
     const processColumnChanges = async (extension, extractor, isYml = false) => {
       const changes = [];
@@ -345,6 +313,7 @@ const run = async () => {
 
       return { changes, added, removed };
     };
+
     // Process SQL changes
     const { added: sqlAdded, removed: sqlRemoved } = await processColumnChanges(".sql", extractColumnsFromSQL);
     summary += `\n### SQL Column Changes\n`;
@@ -356,6 +325,7 @@ const run = async () => {
     summary += `\n### YML Column Changes\n`;
     summary += `Added columns(${ymlAdded.length}): ${ymlAdded.map(c => c.name).join(', ')}\n`;
     summary += `Removed columns(${ymlRemoved.length}): ${ymlRemoved.map(c => c.name).join(', ')}\n`;
+
     // Post comment
     if (github.context.payload.pull_request) {
       try {
