@@ -86,34 +86,6 @@ const getTasks = async () => {
   }
 };
 
-// const getLineageData = async (asset_id, connection_id, entity) => {
-//   try {
-//     const lineageUrl = `${dqlabs_base_url}/api/lineage/entities/linked/`;
-//     const payload = {
-//       asset_id,
-//       connection_id,
-//       entity,
-//     };
- 
-//     const response = await axios.post(
-//       lineageUrl,
-//       payload,
-//       {
-//         headers: {
-//           "Content-Type": "application/json",
-//           "client-id": clientId,
-//           "client-secret": clientSecret,
-//         },
-//       }
-//     );
- 
-//     return safeArray(response?.data?.response?.data);
-//   } catch (error) {
-//     core.error(`[getLineageData] Error for ${entity}: ${error.message}`);
-//     return [];
-//   }
-// };
-
 const getImpactAnalysisData = async (asset_id, connection_id, entity, isDirect = true) => {
   try {
     const impactAnalysisUrl = `${dqlabs_base_url}/api/lineage/impact-analysis/`;
@@ -151,11 +123,11 @@ const run = async () => {
   try {
     // Initialize summary with basic info
     let summary = "## Impact Analysis Report\n\n";
-    
+
     // Get changed files safely
     const changedFiles = safeArray(await getChangedFiles());
     core.info(`Found ${changedFiles.length} changed files`);
-    
+
     // Process changed SQL models
     const changedModels = changedFiles
       .filter(file => file && typeof file === "string" && file.endsWith(".sql"))
@@ -164,25 +136,33 @@ const run = async () => {
 
     // Get tasks safely
     const tasks = await getTasks();
-    
+
     // Match tasks with changed models
     const matchedTasks = tasks
       .filter(task => task?.connection_type === "dbt")
       .filter(task => changedModels.includes(task?.name))
       .map(task => ({
         ...task,
-        entity: task?.task_id || ""
-      }));
+        entity: task?.task_id || "",
+        filePath: changedFiles.find(f => path.basename(f, path.extname(f)) === task.name)
+      }))
+      .filter(task => task.filePath); // Ensure we have the file path
 
-    // Process lineage data
-    // Process impact data
-    const Everydata = {
-      direct: [],
-      indirect: []
-    };
+    // Store impacts per file
+    const fileImpacts = {};
 
-    // Get direct impacts (without depth)
+    // Initialize file impacts structure
+    matchedTasks.forEach(task => {
+      fileImpacts[task.filePath] = {
+        direct: [],
+        indirect: [],
+        taskName: task.name
+      };
+    });
+
+    // Process impact data for each file
     for (const task of matchedTasks) {
+      // Get direct impacts (without depth)
       const directImpact = await getImpactAnalysisData(
         task.asset_id,
         task.connection_id,
@@ -195,11 +175,9 @@ const run = async () => {
         .filter(table => table?.name !== task.name)
         .filter(Boolean);
 
-      Everydata.direct.push(...filteredDirectImpact);
-    }
+      fileImpacts[task.filePath].direct.push(...filteredDirectImpact);
 
-    // Get indirect impacts (with depth=10)
-    for (const task of matchedTasks) {
+      // Get indirect impacts (with depth=10)
       const indirectImpact = await getImpactAnalysisData(
         task.asset_id,
         task.connection_id,
@@ -207,19 +185,22 @@ const run = async () => {
         false // isDirect = false
       );
 
-      Everydata.indirect.push(...indirectImpact);
+      fileImpacts[task.filePath].indirect.push(...indirectImpact);
     }
 
     // Create unique key function for comparison
     const uniqueKey = (item) => `${item?.name}-${item?.connection_id}-${item?.asset_name}`;
 
-    // Remove direct impacts from indirect results
-    const directKeys = new Set(Everydata.direct.map(uniqueKey));
-    Everydata.indirect = Everydata.indirect.filter(
-      item => !directKeys.has(uniqueKey(item))
-    );
+    // Remove direct impacts from indirect results for each file
+    Object.keys(fileImpacts).forEach(filePath => {
+      const impacts = fileImpacts[filePath];
+      const directKeys = new Set(impacts.direct.map(uniqueKey));
+      impacts.indirect = impacts.indirect.filter(
+        item => !directKeys.has(uniqueKey(item))
+      );
+    });
 
-    // Deduplicate results
+    // Deduplicate results within each file
     const dedup = (arr) => {
       const seen = new Set();
       return arr.filter(item => {
@@ -230,15 +211,17 @@ const run = async () => {
       });
     };
 
-    Everydata.direct = dedup(Everydata.direct);
-    Everydata.indirect = dedup(Everydata.indirect);
+    Object.keys(fileImpacts).forEach(filePath => {
+      fileImpacts[filePath].direct = dedup(fileImpacts[filePath].direct);
+      fileImpacts[filePath].indirect = dedup(fileImpacts[filePath].indirect);
+    });
 
     const constructItemUrl = (item, baseUrl) => {
       if (!item || !baseUrl) return "#";
-      
+
       try {
         const url = new URL(baseUrl);
-        
+
         // Handle pipeline items
         if (item.asset_group === "pipeline") {
           if (item.is_transform) {
@@ -248,13 +231,13 @@ const run = async () => {
           }
           return url.toString();
         }
-        
+
         // Handle data items
         if (item.asset_group === "data") {
           url.pathname = `/observe/data/${item.redirect_id}/measures`;
           return url.toString();
         }
-        
+
         // Default case
         return "#";
       } catch (error) {
@@ -263,31 +246,62 @@ const run = async () => {
       }
     };
 
-    // Build summary
-    // Helper function to create collapsible sections when needed
-    const buildImpactSection = (directItems, indirectItems) => {
-      const totalImpacts = directItems.length + indirectItems.length;
-      const shouldCollapse = totalImpacts > 20;
+    // Build the complete impacts section with single collapse
+    const buildImpactsSection = (fileImpacts) => {
+      let content = '';
+      let totalDirect = 0;
+      let totalIndirect = 0;
       
-      let content = `## Directly Impacted (${directItems.length})\n`;
-      directItems.forEach(model => {
-        const url = constructItemUrl(model, dqlabs_createlink_url);
-        content += `- [${model?.name || 'Unknown'}](${url})\n`;
+      // Generate content for each file
+      Object.entries(fileImpacts).forEach(([filePath, impacts]) => {
+        const { direct, indirect, taskName } = impacts;
+        totalDirect += direct.length;
+        totalIndirect += indirect.length;
+
+        content += `### File: ${filePath}\n`;
+        content += `**Model:** ${taskName}\n\n`;
+        
+        content += `#### Directly Impacted (${direct.length})\n`;
+        direct.forEach(model => {
+          const url = constructItemUrl(model, dqlabs_createlink_url);
+          content += `- [${model?.name || 'Unknown'}](${url})\n`;
+        });
+
+        content += `\n#### Indirectly Impacted (${indirect.length})\n`;
+        indirect.forEach(model => {
+          const url = constructItemUrl(model, dqlabs_createlink_url);
+          content += `- [${model?.name || 'Unknown'}](${url})\n`;
+        });
+
+        content += '\n\n';
       });
 
-      content += `\n## Indirectly Impacted (${indirectItems.length})\n`;
-      indirectItems.forEach(model => {
-        const url = constructItemUrl(model, dqlabs_createlink_url);
-        content += `- [${model?.name || 'Unknown'}](${url})\n`;
-      });
+      const totalImpacts = totalDirect + totalIndirect;
+      const shouldCollapse = totalImpacts > 20;
 
-      return shouldCollapse
-        ? `<details>\n<summary><b>Impact Analysis (${totalImpacts} items) - Click to expand</b></summary>\n\n${content}\n</details>`
-        : content;
+      if (shouldCollapse) {
+        return `<details>
+<summary><b>Impact Analysis (${totalImpacts} total impacts - ${Object.keys(fileImpacts).length} files changed) - Click to expand</b></summary>
+
+${content}
+</details>`;
+      }
+      
+      return content;
     };
 
-    // In your summary generation:
-    summary += buildImpactSection(Everydata.direct, Everydata.indirect);
+    // Add impacts to summary
+    summary += buildImpactsSection(fileImpacts);
+    
+    // Add summary of total impacts
+    const totalDirect = Object.values(fileImpacts).reduce((sum, impacts) => sum + impacts.direct.length, 0);
+    const totalIndirect = Object.values(fileImpacts).reduce((sum, impacts) => sum + impacts.indirect.length, 0);
+    
+    summary += `\n## Summary of Impacts\n`;
+    summary += `- **Total Directly Impacted:** ${totalDirect}\n`;
+    summary += `- **Total Indirectly Impacted:** ${totalIndirect}\n`;
+    summary += `- **Files Changed:** ${Object.keys(fileImpacts).length}\n\n`;
+
     // Process column changes
     const processColumnChanges = async (extension, extractor, isYml = false) => {
       const changes = [];
@@ -298,7 +312,7 @@ const run = async () => {
         try {
           const baseSha = process.env.GITHUB_BASE_SHA || github.context.payload.pull_request?.base?.sha;
           const headSha = process.env.GITHUB_HEAD_SHA || github.context.payload.pull_request?.head?.sha;
-          
+
           const baseContent = baseSha ? await getFileContent(baseSha, file) : null;
           const headContent = await getFileContent(headSha, file);
           if (!headContent) continue;
@@ -345,6 +359,7 @@ const run = async () => {
 
       return { changes, added, removed };
     };
+
     // Process SQL changes
     const { added: sqlAdded, removed: sqlRemoved } = await processColumnChanges(".sql", extractColumnsFromSQL);
     summary += `\n### SQL Column Changes\n`;
@@ -356,6 +371,7 @@ const run = async () => {
     summary += `\n### YML Column Changes\n`;
     summary += `Added columns(${ymlAdded.length}): ${ymlAdded.map(c => c.name).join(', ')}\n`;
     summary += `Removed columns(${ymlRemoved.length}): ${ymlRemoved.map(c => c.name).join(', ')}\n`;
+
     // Post comment
     if (github.context.payload.pull_request) {
       try {
@@ -375,7 +391,7 @@ const run = async () => {
     await core.summary
       .addRaw(summary)
       .write();
-      
+
     core.setOutput("impact_markdown", summary);
   } catch (error) {
     core.setFailed(`[MAIN] Unhandled error: ${error.message}`);
