@@ -28,7 +28,6 @@ new_column,
 CUSTOMER_ID,
 ORDER_DATE,
 STATUS,
-FIRST_NAME,
 LAST_NAME
 FROM
 customer_data
